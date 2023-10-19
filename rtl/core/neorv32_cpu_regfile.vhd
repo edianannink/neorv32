@@ -70,7 +70,9 @@ entity neorv32_cpu_regfile is
     rs1_o  : out std_ulogic_vector(XLEN-1 downto 0); -- rs1
     rs2_o  : out std_ulogic_vector(XLEN-1 downto 0); -- rs2
     rs3_o  : out std_ulogic_vector(XLEN-1 downto 0); -- rs3
-    rs4_o  : out std_ulogic_vector(XLEN-1 downto 0)  -- rs4
+    rs4_o  : out std_ulogic_vector(XLEN-1 downto 0); -- rs4
+    -- ECC error --
+    ecc_error_o : out std_logic
   );
 end neorv32_cpu_regfile;
 
@@ -80,7 +82,7 @@ architecture neorv32_cpu_regfile_rtl of neorv32_cpu_regfile is
   constant addr_bits_c : natural := cond_sel_natural_f(RVE, 4, 5); -- address width
 
   -- register file --
-  type   reg_file_t is array ((2**addr_bits_c)-1 downto 0) of std_ulogic_vector(XLEN-1 downto 0);
+  type   reg_file_t is array ((2**addr_bits_c)-1 downto 0) of std_ulogic_vector(38 downto 0);
   signal reg_file : reg_file_t;
 
   -- access --
@@ -92,7 +94,52 @@ architecture neorv32_cpu_regfile_rtl of neorv32_cpu_regfile is
   signal opc_addr : std_ulogic_vector(4 downto 0); -- rs3 address
   signal opd_addr : std_ulogic_vector(4 downto 0); -- rs4 address
 
+  -- ECC signals --
+  signal ecc_enc_out : std_logic_vector(38 downto 0);
+  signal ecc_dec_opa_out, ecc_dec_opb_out: std_logic_vector(31 downto 0);
+  signal ecc_dec_opa_err_out, ecc_dec_opb_err_out: std_logic_vector(1 downto 0);
+  
+  component prim_secded_39_32_enc
+  port (
+    data_i : in std_ulogic_vector(31 downto 0);
+    data_o : out std_ulogic_vector(38 downto 0)
+  );
+  end component;
+
+  component prim_secded_39_32_dec
+  port (
+    data_i : in std_ulogic_vector(38 downto 0);
+    data_o : out std_ulogic_vector(31 downto 0);
+    syndrome_o : out std_ulogic_vector(6 downto 0);
+    err_o : out std_ulogic_vector(1 downto 0)
+  );
+  end component;
+
 begin
+
+  prim_secded_39_32_enc_inst: prim_secded_39_32_enc
+    port map (
+      data_i => rf_wdata,
+      data_o => ecc_enc_out
+    );
+
+  prim_secded_39_32_dec_inst_opa: prim_secded_39_32_dec
+    port map (
+      data_i     => reg_file(to_integer(unsigned(opa_addr(addr_bits_c-1 downto 0)))),
+      data_o     => ecc_dec_opa_out,
+      syndrome_o => open,
+      err_o      => ecc_dec_opa_err_out
+    );
+
+  prim_secded_39_32_dec_inst_opb: prim_secded_39_32_dec
+    port map (
+      data_i     => reg_file(to_integer(unsigned(opb_addr(addr_bits_c-1 downto 0)))),
+      data_o     => ecc_dec_opb_out,
+      syndrome_o => open,
+      err_o      => ecc_dec_opb_err_out
+    );
+
+  ecc_error_o <= (or ecc_dec_opa_err_out) or (or ecc_dec_opb_err_out);
 
   -- Data Write-Back Select -----------------------------------------------------------------
   -- -------------------------------------------------------------------------------------------
@@ -129,10 +176,10 @@ begin
   begin
     if rising_edge(clk_i) then
       if (rf_we = '1') then
-        reg_file(to_integer(unsigned(opa_addr(addr_bits_c-1 downto 0)))) <= rf_wdata;
+        reg_file(to_integer(unsigned(opa_addr(addr_bits_c-1 downto 0)))) <= ecc_enc_out;
       end if;
-      rs1_o <= reg_file(to_integer(unsigned(opa_addr(addr_bits_c-1 downto 0))));
-      rs2_o <= reg_file(to_integer(unsigned(opb_addr(addr_bits_c-1 downto 0))));
+      rs1_o <= ecc_dec_opa_out;
+      rs2_o <= ecc_dec_opb_out;
 
       -- optional 3rd read port --
       if (RS3_EN = true) then

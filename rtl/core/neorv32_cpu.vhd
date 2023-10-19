@@ -91,7 +91,9 @@ entity neorv32_cpu is
     ibus_rsp_i : in  bus_rsp_t; -- response bus
     -- data bus interface --
     dbus_req_o : out bus_req_t; -- request bus
-    dbus_rsp_i : in  bus_rsp_t  -- response bus
+    dbus_rsp_i : in  bus_rsp_t; -- response bus
+    -- ECC signals --
+    ecc_regfile_error_o : out std_logic
   );
 end neorv32_cpu;
 
@@ -134,6 +136,7 @@ architecture neorv32_cpu_rtl of neorv32_cpu is
   signal next_pc      : std_ulogic_vector(XLEN-1 downto 0); -- next pc (for next executed instruction)
   signal pmp_ex_fault : std_ulogic; -- PMP instruction fetch fault
   signal pmp_rw_fault : std_ulogic; -- PMP read/write access fault
+  signal ecc_regfile_error : std_logic; -- ECC error in CPU register file
 
 begin
 
@@ -291,7 +294,9 @@ begin
     rs1_o  => rs1,       -- rs1
     rs2_o  => rs2,       -- rs2
     rs3_o  => rs3,       -- rs3
-    rs4_o  => rs4        -- rs4
+    rs4_o  => rs4,       -- rs4
+    -- ECC error --
+    ecc_error_o => ecc_regfile_error
   );
 
 

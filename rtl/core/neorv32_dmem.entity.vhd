@@ -46,6 +46,7 @@ entity neorv32_dmem is
   port (
     clk_i     : in  std_ulogic; -- global clock line
     bus_req_i : in  bus_req_t;  -- bus request
-    bus_rsp_o : out bus_rsp_t   -- bus response
+    bus_rsp_o : out bus_rsp_t;  -- bus response
+    ecc_error : out std_logic   -- ECC error
   );
 end neorv32_dmem;

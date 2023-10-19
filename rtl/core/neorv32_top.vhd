@@ -529,7 +529,9 @@ begin
       ibus_rsp_i => cpu_i_rsp,
       -- data bus interface --
       dbus_req_o => cpu_d_req,
-      dbus_rsp_i => cpu_d_rsp
+      dbus_rsp_i => cpu_d_rsp,
+      -- ECC signals --
+      ecc_regfile_error_o => open
     );
 
     -- advanced memory control --
@@ -803,7 +805,8 @@ begin
       port map (
         clk_i     => clk_i,
         bus_req_i => dmem_req,
-        bus_rsp_o => dmem_rsp
+        bus_rsp_o => dmem_rsp,
+        ecc_error => open
       );
     end generate;
 
