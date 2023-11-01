@@ -92,8 +92,10 @@ entity neorv32_cpu is
     -- data bus interface --
     dbus_req_o : out bus_req_t; -- request bus
     dbus_rsp_i : in  bus_rsp_t; -- response bus
-    -- ECC signals --
-    ecc_regfile_error_o : out std_logic
+    -- ecc signals --
+    ecc_regfile_error_o : out std_logic; -- ecc error
+    -- instruction validator --
+    illegal_instr: out std_logic
   );
 end neorv32_cpu;
 
@@ -258,7 +260,9 @@ begin
     ma_load_i     => ma_load,        -- misaligned load data address
     ma_store_i    => ma_store,       -- misaligned store data address
     be_load_i     => be_load,        -- bus error on load data access
-    be_store_i    => be_store        -- bus error on store data access
+    be_store_i    => be_store,       -- bus error on store data access
+    -- instruction validator --
+    illegal_instr => illegal_instr   -- instruction validator detected illegal instruction
   );
 
   -- external CSR read-back --

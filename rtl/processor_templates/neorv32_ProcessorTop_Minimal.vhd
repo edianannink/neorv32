@@ -55,18 +55,22 @@ entity neorv32_ProcessorTop_Minimal is
     -- RISC-V CPU Extensions --
     CPU_EXTENSION_RISCV_A        : boolean := false;  -- implement atomic memory operations extension?
     CPU_EXTENSION_RISCV_B        : boolean := false;  -- implement bit-manipulation extension?
-    CPU_EXTENSION_RISCV_C        : boolean := false;  -- implement compressed extension?
+    CPU_EXTENSION_RISCV_C        : boolean := true;  -- implement compressed extension?
     CPU_EXTENSION_RISCV_E        : boolean := false;  -- implement embedded RF extension?
-    CPU_EXTENSION_RISCV_M        : boolean := false;  -- implement mul/div extension?
-    CPU_EXTENSION_RISCV_U        : boolean := false;  -- implement user mode extension?
+    CPU_EXTENSION_RISCV_M        : boolean := true;  -- implement mul/div extension?
+    CPU_EXTENSION_RISCV_U        : boolean := true;  -- implement user mode extension?
     CPU_EXTENSION_RISCV_Zfinx    : boolean := false;  -- implement 32-bit floating-point extension (using INT regs!)
     CPU_EXTENSION_RISCV_Zicntr   : boolean := true;   -- implement base counters?
-    CPU_EXTENSION_RISCV_Zihpm    : boolean := false;  -- implement hardware performance monitors?
+    CPU_EXTENSION_RISCV_Zihpm    : boolean := true;   -- implement hardware performance monitors?
     CPU_EXTENSION_RISCV_Zifencei : boolean := false;  -- implement instruction stream sync.?
     CPU_EXTENSION_RISCV_Zmmul    : boolean := false;  -- implement multiply-only M sub-extension?
     CPU_EXTENSION_RISCV_Zxcfu    : boolean := false;  -- implement custom (instr.) functions unit?
     -- Processor peripherals --
-    IO_GPIO_NUM       : natural range 0 to 64 := 8    -- number of GPIO input/output pairs (0..64)
+    IO_GPIO_NUM       : natural range 0 to 64     := 8;     -- number of GPIO input/output pairs (0..64)
+    IO_UART0_EN       : boolean                   := true;  -- implement primary universal asynchronous receiver/transmitter (UART0)?
+    -- Hardware Performance Monitors (HPM) --
+    HPM_NUM_CNTS      : natural range 0 to 13 := 0;         -- number of implemented HPM counters (0..13)
+    HPM_CNT_WIDTH     : natural range 0 to 64 := 40         -- total size of HPM counters (0..64)
   );
   port (
     -- Global control --
@@ -84,7 +88,10 @@ entity neorv32_ProcessorTop_Minimal is
     wb_ack_i  : in  std_ulogic := 'L'; -- transfer acknowledge
     wb_err_i  : in  std_ulogic := 'L'; -- transfer error
     -- GPIO (available if IO_GPIO_NUM > 0) --
-    gpio_o    : out std_ulogic_vector(7 downto 0) -- parallel output
+    gpio_o    : out std_ulogic_vector(7 downto 0); -- parallel output
+    -- primary UART0 (available if IO_UART0_EN = true) --
+    uart0_txd_o    : out std_ulogic; -- UART0 send data
+    uart0_rxd_i    : in  std_ulogic := 'U' -- UART0 receive data
   );
 end entity;
 
@@ -92,6 +99,7 @@ architecture neorv32_ProcessorTop_Minimal_rtl of neorv32_ProcessorTop_Minimal is
 
   -- internal IO connection --
   signal con_gpio_o  : std_ulogic_vector(63 downto 0);
+  signal illegal_instr : std_logic := '0';
 
 begin
 
@@ -127,7 +135,8 @@ begin
     CPU_EXTENSION_RISCV_Zmmul    => CPU_EXTENSION_RISCV_Zmmul,     -- implement multiply-only M sub-extension?
     CPU_EXTENSION_RISCV_Zxcfu    => CPU_EXTENSION_RISCV_Zxcfu,     -- implement custom (instr.) functions unit?
     -- Processor peripherals --
-    IO_GPIO_NUM                  => IO_GPIO_NUM         -- number of GPIO input/output pairs (0..64)
+    IO_GPIO_NUM                  => IO_GPIO_NUM,         -- number of GPIO input/output pairs (0..64)
+    IO_UART0_EN                  => IO_UART0_EN          -- implement primary universal asynchronous receiver/transmitter (UART0)?
   )
   port map (
     -- Global control --
@@ -145,11 +154,22 @@ begin
     wb_stb_o => wb_stb_o,
     wb_cyc_o => wb_cyc_o,
     wb_ack_i => wb_ack_i,
-    wb_err_i => wb_err_i
+    wb_err_i => wb_err_i,
+    -- primary UART0 (available if IO_UART0_EN = true) --
+    uart0_txd_o => uart0_txd_o, -- UART0 send data
+    uart0_rxd_i => uart0_rxd_i, -- UART0 receive data
+    -- instruction validator --
+    illegal_instr => illegal_instr
   );
 
   -- GPIO --
-  gpio_o <= con_gpio_o(7 downto 0);
-
+  gpio_o(0) <= illegal_instr;
+  gpio_o(1) <= illegal_instr;
+  gpio_o(2) <= illegal_instr;
+  gpio_o(3) <= illegal_instr;
+  gpio_o(4) <= illegal_instr;
+  gpio_o(5) <= illegal_instr;
+  gpio_o(6) <= illegal_instr;
+  gpio_o(7) <= illegal_instr;
 
 end architecture;

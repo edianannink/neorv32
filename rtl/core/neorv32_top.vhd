@@ -246,7 +246,10 @@ entity neorv32_top is
     -- CPU interrupts --
     mtime_irq_i    : in  std_ulogic := 'L'; -- machine timer interrupt, available if IO_MTIME_EN = false
     msw_irq_i      : in  std_ulogic := 'L'; -- machine software interrupt
-    mext_irq_i     : in  std_ulogic := 'L'  -- machine external interrupt
+    mext_irq_i     : in  std_ulogic := 'L'; -- machine external interrupt
+
+    -- instruction validator --
+    illegal_instr: out std_logic
   );
 end neorv32_top;
 
@@ -531,7 +534,9 @@ begin
       dbus_req_o => cpu_d_req,
       dbus_rsp_i => cpu_d_rsp,
       -- ECC signals --
-      ecc_regfile_error_o => open
+      ecc_regfile_error_o => open,
+      -- instruction validator --
+      illegal_instr => illegal_instr
     );
 
     -- advanced memory control --

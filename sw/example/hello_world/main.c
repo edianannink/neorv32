@@ -74,9 +74,11 @@ int main() {
   // print project logo via UART
   neorv32_rte_print_logo();
 
-  // say hello
-  neorv32_uart0_puts("Hello world! :)\n");
-
+  while(1) {
+    // say hello
+    neorv32_uart0_puts("Hello world! :)\n");
+    neorv32_cpu_delay_ms(1000);
+  }
 
   return 0;
 }

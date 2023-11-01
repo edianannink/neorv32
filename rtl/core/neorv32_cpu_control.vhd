@@ -120,7 +120,9 @@ entity neorv32_cpu_control is
     ma_load_i     : in  std_ulogic; -- misaligned load data address
     ma_store_i    : in  std_ulogic; -- misaligned store data address
     be_load_i     : in  std_ulogic; -- bus error on load data access
-    be_store_i    : in  std_ulogic  -- bus error on store data access
+    be_store_i    : in  std_ulogic; -- bus error on store data access
+    -- instruction validator --
+    illegal_instr: out std_logic := '0'
   );
 end neorv32_cpu_control;
 
@@ -352,6 +354,19 @@ architecture neorv32_cpu_control_rtl of neorv32_cpu_control is
   signal csr_rdata, xcsr_rdata : std_ulogic_vector(XLEN-1 downto 0);
 
 begin
+
+-- Instruction Validator ------------------------------------------------------------------
+  -- -------------------------------------------------------------------------------------------
+  instruction_validator_inst: entity neorv32.instruction_validator
+    port map (
+      clk => clk_i,
+      reset => not rstn_i,
+      instr => bus_rsp_i.data,
+      addr(31 downto 30) => "00",
+      addr(29 downto 0) => fetch_engine.pc,
+      ack_instr => bus_rsp_i.ack,
+      illegal_instr => illegal_instr
+    );
 
 -- ****************************************************************************************************************************
 -- Instruction Fetch (always fetch 32-bit-aligned 32-bit chunks of data)

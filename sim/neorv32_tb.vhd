@@ -222,20 +222,20 @@ begin
     VENDOR_ID                    => x"00000000",   -- vendor's JEDEC ID
     INT_BOOTLOADER_EN            => false,         -- boot configuration: true = boot explicit bootloader; false = boot from int/ext (I)MEM
     -- On-Chip Debugger (OCD) --
-    ON_CHIP_DEBUGGER_EN          => true,          -- implement on-chip debugger
+    ON_CHIP_DEBUGGER_EN          => false,          -- implement on-chip debugger
     -- RISC-V CPU Extensions --
-    CPU_EXTENSION_RISCV_A        => true,          -- implement atomic memory operations extension?
-    CPU_EXTENSION_RISCV_B        => true,          -- implement bit-manipulation extension?
+    CPU_EXTENSION_RISCV_A        => false,          -- implement atomic memory operations extension?
+    CPU_EXTENSION_RISCV_B        => false,          -- implement bit-manipulation extension?
     CPU_EXTENSION_RISCV_C        => true,          -- implement compressed extension?
     CPU_EXTENSION_RISCV_E        => false,         -- implement embedded RF extension?
     CPU_EXTENSION_RISCV_M        => true,          -- implement mul/div extension?
     CPU_EXTENSION_RISCV_U        => true,          -- implement user mode extension?
-    CPU_EXTENSION_RISCV_Zfinx    => true,          -- implement 32-bit floating-point extension (using INT reg!)
+    CPU_EXTENSION_RISCV_Zfinx    => false,          -- implement 32-bit floating-point extension (using INT reg!)
     CPU_EXTENSION_RISCV_Zicntr   => true,          -- implement base counters?
     CPU_EXTENSION_RISCV_Zihpm    => true,          -- implement hardware performance monitors?
-    CPU_EXTENSION_RISCV_Zifencei => true,          -- implement instruction stream sync.?
+    CPU_EXTENSION_RISCV_Zifencei => false,          -- implement instruction stream sync.?
     CPU_EXTENSION_RISCV_Zmmul    => false,         -- implement multiply-only M sub-extension?
-    CPU_EXTENSION_RISCV_Zxcfu    => true,          -- implement custom (instr.) functions unit?
+    CPU_EXTENSION_RISCV_Zxcfu    => false,          -- implement custom (instr.) functions unit?
     -- Extension Options --
     FAST_MUL_EN                  => false,         -- use DSPs for M extension's multiplier
     FAST_SHIFT_EN                => false,         -- use barrel shifter for shift operations
@@ -262,8 +262,8 @@ begin
     MEM_EXT_TIMEOUT              => 256,           -- cycles after a pending bus access auto-terminates (0 = disabled)
     MEM_EXT_PIPE_MODE            => false,         -- protocol: false=classic/standard wishbone mode, true=pipelined wishbone mode
     MEM_EXT_BIG_ENDIAN           => false,         -- byte order: true=big-endian, false=little-endian
-    MEM_EXT_ASYNC_RX             => true,          -- use register buffer for RX data when false
-    MEM_EXT_ASYNC_TX             => true,          -- use register buffer for TX data when false
+    MEM_EXT_ASYNC_RX             => false,          -- use register buffer for RX data when false
+    MEM_EXT_ASYNC_TX             => false,          -- use register buffer for TX data when false
     -- External Interrupts Controller (XIRQ) --
     XIRQ_NUM_CH                  => 32,            -- number of external IRQ channels (0..32)
     XIRQ_TRIGGER_TYPE            => (others => '1'), -- trigger type: 0=level, 1=edge

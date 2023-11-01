@@ -25,9 +25,14 @@ NEORV32 = PRJ.add_library("neorv32")
 NEORV32.add_source_files([
     ROOT / "*.vhd",
     ROOT / ".." / "rtl" / "**" / "*.vhd",
+    ROOT / ".." / "rtl" / "**" / "*.sv",
     # In VUnit <=v4.5.0, the glob search is not recursive,
     # hence subdir 'mem' is not picked by the previous pattern
-    ROOT / ".." / "rtl" / "core" / "mem" / "*.vhd"
+    ROOT / ".." / "rtl" / "core" / "mem" / "neorv32_dmem.default.vhd",
+    ROOT / ".." / "rtl" / "core" / "mem" / "neorv32_imem.default.vhd",
+    ROOT / "../../../" / "logic" / "iv" / "ram.vhd",
+    ROOT / "../../../" / "logic" / "iv" / "multiply_shift.vhd",
+    ROOT / "../../../" / "logic" / "iv" / "instruction_validator.vhd"
 ])
 
 NEORV32.test_bench("neorv32_tb").set_generic("ci_mode", args.ci_mode)

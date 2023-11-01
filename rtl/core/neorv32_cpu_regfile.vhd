@@ -96,8 +96,8 @@ architecture neorv32_cpu_regfile_rtl of neorv32_cpu_regfile is
 
   -- ECC signals --
   signal ecc_enc_out : std_logic_vector(38 downto 0);
-  signal ecc_dec_opa_out, ecc_dec_opb_out: std_logic_vector(31 downto 0);
-  signal ecc_dec_opa_err_out, ecc_dec_opb_err_out: std_logic_vector(1 downto 0);
+  signal ecc_dec_opa_out, ecc_dec_opb_out, ecc_dec_opc_out, ecc_dec_opd_out: std_logic_vector(31 downto 0);
+  signal ecc_dec_opa_err_out, ecc_dec_opb_err_out, ecc_dec_opc_err_out, ecc_dec_opd_err_out: std_logic_vector(1 downto 0);
   
   component prim_secded_39_32_enc
   port (
@@ -139,7 +139,24 @@ begin
       err_o      => ecc_dec_opb_err_out
     );
 
-  ecc_error_o <= (or ecc_dec_opa_err_out) or (or ecc_dec_opb_err_out);
+  prim_secded_39_32_dec_inst_opc: prim_secded_39_32_dec
+    port map (
+      data_i     => reg_file(to_integer(unsigned(opc_addr(addr_bits_c-1 downto 0)))),
+      data_o     => ecc_dec_opc_out,
+      syndrome_o => open,
+      err_o      => ecc_dec_opc_err_out
+    );
+
+  prim_secded_39_32_dec_inst_opd: prim_secded_39_32_dec
+    port map (
+      data_i     => reg_file(to_integer(unsigned(opd_addr(addr_bits_c-1 downto 0)))),
+      data_o     => ecc_dec_opd_out,
+      syndrome_o => open,
+      err_o      => ecc_dec_opd_err_out
+    );
+
+
+  ecc_error_o <= (or ecc_dec_opa_err_out) or (or ecc_dec_opb_err_out) or (or ecc_dec_opc_err_out) or (or ecc_dec_opd_err_out);
 
   -- Data Write-Back Select -----------------------------------------------------------------
   -- -------------------------------------------------------------------------------------------
@@ -183,14 +200,14 @@ begin
 
       -- optional 3rd read port --
       if (RS3_EN = true) then
-        rs3_o <= reg_file(to_integer(unsigned(opc_addr(addr_bits_c-1 downto 0))));
+        rs3_o <= ecc_dec_opc_out;
       else
         rs3_o <= (others => '0');
       end if;
 
       -- optional 4th read port --
       if (RS4_EN = true) then
-        rs4_o <= reg_file(to_integer(unsigned(opd_addr(addr_bits_c-1 downto 0))));
+        rs4_o <= ecc_dec_opd_out;
       else
         rs4_o <= (others => '0');
       end if;
