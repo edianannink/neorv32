@@ -36,3 +36,7 @@ sw/image_gen/image_gen.exe
 # compiled ghdl stuff
 *.cf
 *.o
+
+# vunit generated files
+vunit_out/
+vhdl_ls.toml
