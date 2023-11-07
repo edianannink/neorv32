@@ -779,8 +779,8 @@ package neorv32_package is
       PMP_NUM_REGIONS              : natural range 0 to 16 := 0;
       PMP_MIN_GRANULARITY          : natural := 4;
       -- Hardware Performance Monitors (HPM) --
-      HPM_NUM_CNTS                 : natural range 0 to 13 := 13;
-      HPM_CNT_WIDTH                : natural range 0 to 64 := 32;
+      HPM_NUM_CNTS                 : natural range 0 to 13 := 0;
+      HPM_CNT_WIDTH                : natural range 0 to 64 := 40;
       -- Atomic Memory Access - Reservation Set Granularity --
       AMO_RVS_GRANULARITY          : natural := 4;
       -- Internal Instruction memory (IMEM) --
