@@ -84,6 +84,8 @@ architecture neorv32_dmem_rtl of neorv32_dmem is
 
   signal ecc_error_byte0, ecc_error_byte1, ecc_error_byte2, ecc_error_byte3 : std_ulogic_vector(1 downto 0);
 
+  signal ecc_error_out : std_logic_vector(1 downto 0);
+
 begin
 
   -- Sanity Checks --------------------------------------------------------------------------
@@ -150,13 +152,13 @@ begin
   -- ECC --------------------------------------------------------------------------------------
   prim_secded_13_8_enc_inst_byte0 : prim_secded_13_8_enc
   port map (
-    data_i => bus_req_i.data(07 downto 00),
+    data_i => bus_req_i.data(7 downto 0),
     data_o => ecc_enc_byte0_out
   );
 
   prim_secded_13_8_enc_inst_byte1 : prim_secded_13_8_enc
   port map (
-    data_i => bus_req_i.data(15 downto 08),
+    data_i => bus_req_i.data(15 downto 8),
     data_o => ecc_enc_byte1_out
   );
 
@@ -204,7 +206,16 @@ begin
       err_o      => ecc_error_byte3
     );
 
-  ecc_error <= (or ecc_error_byte0) or (or ecc_error_byte1) or (or ecc_error_byte2) or (or ecc_error_byte3);
+  ecc_error_out(0) <= ecc_error_byte0(0) when (bus_req_i.ben(0) = '1') else '0' or 
+                      ecc_error_byte1(0) when (bus_req_i.ben(1) = '1') else '0' or  
+                      ecc_error_byte2(0) when (bus_req_i.ben(2) = '1') else '0' or  
+                      ecc_error_byte3(0) when (bus_req_i.ben(3) = '1') else '0';
 
+  ecc_error_out(1) <= ecc_error_byte0(1) when (bus_req_i.ben(0) = '1') else '0' or 
+                      ecc_error_byte1(1) when (bus_req_i.ben(1) = '1') else '0' or  
+                      ecc_error_byte2(1) when (bus_req_i.ben(2) = '1') else '0' or  
+                      ecc_error_byte3(1) when (bus_req_i.ben(3) = '1') else '0';
+
+  ecc_error_o <= ecc_error_out when (rden = '1') else (others => '0');
 
 end neorv32_dmem_rtl;

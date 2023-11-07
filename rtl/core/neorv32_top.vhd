@@ -334,6 +334,7 @@ architecture neorv32_top_rtl of neorv32_top is
   end record;
   signal firq      : irq_t;
   signal mtime_irq : std_ulogic;
+  signal ecc_error_dmem_o : std_logic_vector(1 downto 0);
 
 begin
 
@@ -533,9 +534,9 @@ begin
       -- data bus interface --
       dbus_req_o => cpu_d_req,
       dbus_rsp_i => cpu_d_rsp,
-      -- ECC signals --
-      ecc_regfile_error_o => open,
-      -- instruction validator --
+      -- ecc --
+      ecc_error_dmem_i => ecc_error_dmem_o,
+      -- instruction validator
       illegal_instr => illegal_instr
     );
 
@@ -811,13 +812,14 @@ begin
         clk_i     => clk_i,
         bus_req_i => dmem_req,
         bus_rsp_o => dmem_rsp,
-        ecc_error => open
+        ecc_error_o => ecc_error_dmem_o
       );
     end generate;
 
     neorv32_int_dmem_inst_false:
     if (MEM_INT_DMEM_EN = false) or (dmem_size_c = 0) generate
       dmem_rsp <= rsp_terminate_c;
+      ecc_error_dmem_o <= (others => '0');
     end generate;
 
 

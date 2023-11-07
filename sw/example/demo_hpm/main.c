@@ -72,26 +72,26 @@ int main() {
 
   // check if Zihpm is implemented at all
   if ((neorv32_cpu_csr_read(CSR_MXISA) & (1 << CSR_MXISA_ZIHPM)) == 0) {
-    neorv32_uart0_printf("ERROR! Zihpm CPU extension not implemented!\n");
+    //neorv32_uart0_printf("ERROR! Zihpm CPU extension not implemented!\n");
     return 1;
   }
 
   // check if at least one HPM counter is implemented
   if (neorv32_cpu_hpm_get_num_counters() == 0) {
-    neorv32_uart0_printf("ERROR! No HPM counters implemented!\n");
+    //neorv32_uart0_printf("ERROR! No HPM counters implemented!\n");
     return 1;
   }
 
 
   // intro
-  neorv32_uart0_printf("\n<<< NEORV32 Hardware Performance Monitors (HPMs) Example Program >>>\n\n");
-  neorv32_uart0_printf("NOTE: This program will use up to 12 HPM counters (if available).\n\n");
+  //neorv32_uart0_printf("\n<<< NEORV32 Hardware Performance Monitors (HPMs) Example Program >>>\n\n");
+  //neorv32_uart0_printf("NOTE: This program will use up to 12 HPM counters (if available).\n\n");
 
 
   // show HPM hardware configuration
   uint32_t hpm_num = neorv32_cpu_hpm_get_num_counters();
   uint32_t hpm_width = neorv32_cpu_hpm_get_size();
-  neorv32_uart0_printf("Check: %u HPM counters detected, each %u bits wide\n", hpm_num, hpm_width);
+  //neorv32_uart0_printf("Check: %u HPM counters detected, each %u bits wide\n", hpm_num, hpm_width);
 
 
   // stop all CPU counters including HPMs
@@ -147,14 +147,14 @@ int main() {
   // here we are just doing some pointless stuff that will trigger the configured HPM events;
   // note that ALL code being executed will be benchmarked - including traps
   {
-    neorv32_uart0_printf("\n > Doing dummy operations...\n");
-    neorv32_uart0_printf(" > Print some number: %u\n", 52983740);
-    neorv32_uart0_printf(" > An exception (environment call) handled by the RTE: ");
-    asm volatile ("ecall"); // environment call
-    neorv32_uart0_printf(" > An invalid instruction handled by the RTE: ");
+    //neorv32_uart0_printf("\n > Doing dummy operations...\n");
+    //neorv32_uart0_printf(" > Print some number: %u\n", 52983741);
+    //neorv32_uart0_printf(" > An exception (environment call) handled by the RTE: ");
+    //asm volatile ("nop"); // environment call
+    asm volatile("ecall");
+    //neorv32_uart0_printf(" > An invalid instruction handled by the RTE: ");
     asm volatile ("csrwi marchid, 1"); // illegal instruction (writing to read-only CSR)
   }
-
 
   // stop all CPU counters including HPMs
   neorv32_cpu_csr_write(CSR_MCOUNTINHIBIT, -1);
@@ -162,18 +162,18 @@ int main() {
 
   // print HPM counter values (low word only)
   neorv32_uart0_printf("\nHPM results:\n");
-  if (hpm_num >  0) { neorv32_uart0_printf("HPM03.low (compr. instr.)  = %u\n", (uint32_t)neorv32_cpu_csr_read(CSR_MHPMCOUNTER3));  }
-  if (hpm_num >  1) { neorv32_uart0_printf("HPM04.low (I-fetch waits)  = %u\n", (uint32_t)neorv32_cpu_csr_read(CSR_MHPMCOUNTER4));  }
-  if (hpm_num >  2) { neorv32_uart0_printf("HPM05.low (I-issue waits)  = %u\n", (uint32_t)neorv32_cpu_csr_read(CSR_MHPMCOUNTER5));  }
-  if (hpm_num >  3) { neorv32_uart0_printf("HPM06.low (ALU waits)      = %u\n", (uint32_t)neorv32_cpu_csr_read(CSR_MHPMCOUNTER6));  }
-  if (hpm_num >  4) { neorv32_uart0_printf("HPM07.low (MEM loads)      = %u\n", (uint32_t)neorv32_cpu_csr_read(CSR_MHPMCOUNTER7));  }
-  if (hpm_num >  5) { neorv32_uart0_printf("HPM08.low (MEM stores)     = %u\n", (uint32_t)neorv32_cpu_csr_read(CSR_MHPMCOUNTER8));  }
-  if (hpm_num >  6) { neorv32_uart0_printf("HPM09.low (MEM wait)       = %u\n", (uint32_t)neorv32_cpu_csr_read(CSR_MHPMCOUNTER9));  }
-  if (hpm_num >  7) { neorv32_uart0_printf("HPM10.low (jumps)          = %u\n", (uint32_t)neorv32_cpu_csr_read(CSR_MHPMCOUNTER10)); }
-  if (hpm_num >  8) { neorv32_uart0_printf("HPM11.low (cond. branches) = %u\n", (uint32_t)neorv32_cpu_csr_read(CSR_MHPMCOUNTER11)); }
-  if (hpm_num >  9) { neorv32_uart0_printf("HPM12.low (taken branches) = %u\n", (uint32_t)neorv32_cpu_csr_read(CSR_MHPMCOUNTER12)); }
-  if (hpm_num > 10) { neorv32_uart0_printf("HPM13.low (EXCs + IRQs)    = %u\n", (uint32_t)neorv32_cpu_csr_read(CSR_MHPMCOUNTER13)); }
-  if (hpm_num > 11) { neorv32_uart0_printf("HPM14.low (illegal instr.) = %u\n", (uint32_t)neorv32_cpu_csr_read(CSR_MHPMCOUNTER14)); }
+  if (hpm_num >  0) { neorv32_uart0_printf("HPM03.low (DMEM ECC sed)    = %u\n", (uint32_t)neorv32_cpu_csr_read(CSR_MHPMCOUNTER3));  }
+  if (hpm_num >  1) { neorv32_uart0_printf("HPM04.low (DMEM ECC ded)    = %u\n", (uint32_t)neorv32_cpu_csr_read(CSR_MHPMCOUNTER4));  }
+  if (hpm_num >  2) { neorv32_uart0_printf("HPM05.low (Regfile ECC sed) = %u\n", (uint32_t)neorv32_cpu_csr_read(CSR_MHPMCOUNTER5));  }
+  if (hpm_num >  3) { neorv32_uart0_printf("HPM06.low (Regfile ECC ded) = %u\n", (uint32_t)neorv32_cpu_csr_read(CSR_MHPMCOUNTER6));  }
+  if (hpm_num >  4) { neorv32_uart0_printf("HPM07.low (IV flag)         = %u\n", (uint32_t)neorv32_cpu_csr_read(CSR_MHPMCOUNTER7));  }
+  if (hpm_num >  5) { neorv32_uart0_printf("HPM08.low (MEM stores)      = %u\n", (uint32_t)neorv32_cpu_csr_read(CSR_MHPMCOUNTER8));  }
+  if (hpm_num >  6) { neorv32_uart0_printf("HPM09.low (MEM wait)        = %u\n", (uint32_t)neorv32_cpu_csr_read(CSR_MHPMCOUNTER9));  }
+  if (hpm_num >  7) { neorv32_uart0_printf("HPM10.low (jumps)           = %u\n", (uint32_t)neorv32_cpu_csr_read(CSR_MHPMCOUNTER10)); }
+  if (hpm_num >  8) { neorv32_uart0_printf("HPM11.low (cond. branches)  = %u\n", (uint32_t)neorv32_cpu_csr_read(CSR_MHPMCOUNTER11)); }
+  if (hpm_num >  9) { neorv32_uart0_printf("HPM12.low (taken branches)  = %u\n", (uint32_t)neorv32_cpu_csr_read(CSR_MHPMCOUNTER12)); }
+  if (hpm_num > 10) { neorv32_uart0_printf("HPM13.low (EXCs + IRQs)     = %u\n", (uint32_t)neorv32_cpu_csr_read(CSR_MHPMCOUNTER13)); }
+  if (hpm_num > 11) { neorv32_uart0_printf("HPM14.low (illegal instr.)  = %u\n", (uint32_t)neorv32_cpu_csr_read(CSR_MHPMCOUNTER14)); }
 
   neorv32_uart0_printf("\nHPM demo program completed.\n");
 

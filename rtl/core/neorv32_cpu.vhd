@@ -92,8 +92,8 @@ entity neorv32_cpu is
     -- data bus interface --
     dbus_req_o : out bus_req_t; -- request bus
     dbus_rsp_i : in  bus_rsp_t; -- response bus
-    -- ecc signals --
-    ecc_regfile_error_o : out std_logic; -- ecc error
+    -- ecc --
+    ecc_error_dmem_i : in std_logic_vector(1 downto 0);
     -- instruction validator --
     illegal_instr: out std_logic
   );
@@ -138,7 +138,7 @@ architecture neorv32_cpu_rtl of neorv32_cpu is
   signal next_pc      : std_ulogic_vector(XLEN-1 downto 0); -- next pc (for next executed instruction)
   signal pmp_ex_fault : std_ulogic; -- PMP instruction fetch fault
   signal pmp_rw_fault : std_ulogic; -- PMP read/write access fault
-  signal ecc_regfile_error : std_logic; -- ECC error in CPU register file
+  signal ecc_regfile_error : std_logic_vector(1 downto 0); -- ECC error in CPU register file
 
 begin
 
@@ -261,8 +261,11 @@ begin
     ma_store_i    => ma_store,       -- misaligned store data address
     be_load_i     => be_load,        -- bus error on load data access
     be_store_i    => be_store,       -- bus error on store data access
+    -- ecc errors --
+    ecc_error_regfile_i => ecc_regfile_error,
+    ecc_error_dmem_i => ecc_error_dmem_i,
     -- instruction validator --
-    illegal_instr => illegal_instr   -- instruction validator detected illegal instruction
+    illegal_instr_o => illegal_instr
   );
 
   -- external CSR read-back --

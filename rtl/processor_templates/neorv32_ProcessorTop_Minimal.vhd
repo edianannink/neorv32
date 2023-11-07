@@ -69,8 +69,8 @@ entity neorv32_ProcessorTop_Minimal is
     IO_GPIO_NUM       : natural range 0 to 64     := 8;     -- number of GPIO input/output pairs (0..64)
     IO_UART0_EN       : boolean                   := true;  -- implement primary universal asynchronous receiver/transmitter (UART0)?
     -- Hardware Performance Monitors (HPM) --
-    HPM_NUM_CNTS      : natural range 0 to 13 := 0;         -- number of implemented HPM counters (0..13)
-    HPM_CNT_WIDTH     : natural range 0 to 64 := 40         -- total size of HPM counters (0..64)
+    HPM_NUM_CNTS      : natural range 0 to 13 := 13;         -- number of implemented HPM counters (0..13)
+    HPM_CNT_WIDTH     : natural range 0 to 64 := 32         -- total size of HPM counters (0..64)
   );
   port (
     -- Global control --
@@ -136,7 +136,10 @@ begin
     CPU_EXTENSION_RISCV_Zxcfu    => CPU_EXTENSION_RISCV_Zxcfu,     -- implement custom (instr.) functions unit?
     -- Processor peripherals --
     IO_GPIO_NUM                  => IO_GPIO_NUM,         -- number of GPIO input/output pairs (0..64)
-    IO_UART0_EN                  => IO_UART0_EN          -- implement primary universal asynchronous receiver/transmitter (UART0)?
+    IO_UART0_EN                  => IO_UART0_EN,         -- implement primary universal asynchronous receiver/transmitter (UART0)?
+    -- HPM --
+    HPM_CNT_WIDTH                => HPM_CNT_WIDTH,
+    HPM_NUM_CNTS                 => HPM_NUM_CNTS
   )
   port map (
     -- Global control --

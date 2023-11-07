@@ -72,7 +72,7 @@ entity neorv32_cpu_regfile is
     rs3_o  : out std_ulogic_vector(XLEN-1 downto 0); -- rs3
     rs4_o  : out std_ulogic_vector(XLEN-1 downto 0); -- rs4
     -- ECC error --
-    ecc_error_o : out std_logic
+    ecc_error_o : out std_logic_vector(1 downto 0)
   );
 end neorv32_cpu_regfile;
 
@@ -156,7 +156,8 @@ begin
     );
 
 
-  ecc_error_o <= (or ecc_dec_opa_err_out) or (or ecc_dec_opb_err_out) or (or ecc_dec_opc_err_out) or (or ecc_dec_opd_err_out);
+  ecc_error_o(0) <= ecc_dec_opa_err_out(0) or ecc_dec_opb_err_out(0) or ecc_dec_opc_err_out(0) or ecc_dec_opd_err_out(0);
+  ecc_error_o(1) <= ecc_dec_opa_err_out(1) or ecc_dec_opb_err_out(1) or ecc_dec_opc_err_out(1) or ecc_dec_opd_err_out(1);
 
   -- Data Write-Back Select -----------------------------------------------------------------
   -- -------------------------------------------------------------------------------------------
