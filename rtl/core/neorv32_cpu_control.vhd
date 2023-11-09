@@ -125,7 +125,9 @@ entity neorv32_cpu_control is
     ecc_error_regfile_i: in std_logic_vector(1 downto 0);
     ecc_error_dmem_i: in std_logic_vector(1 downto 0);
     -- instruction validator --
-    illegal_instr_o: out std_logic
+    illegal_instr_o: out std_logic;
+    -- imem fetched --
+    imem_fetched_i: in std_logic
   );
 end neorv32_cpu_control;
 
@@ -408,7 +410,9 @@ begin
         -- ------------------------------------------------------------
           fetch_engine.pc        <= execute_engine.pc(XLEN-1 downto 2); -- initialize with logical PC, word aligned
           fetch_engine.unaligned <= execute_engine.pc(1);
-          fetch_engine.state     <= IF_REQUEST;
+          if imem_fetched_i = '1' then
+            fetch_engine.state     <= IF_REQUEST;
+          end if;
 
         when IF_REQUEST => -- request new 32-bit-aligned instruction word
         -- ------------------------------------------------------------

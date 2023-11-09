@@ -68,7 +68,7 @@ architecture neorv32_tb_rtl of neorv32_tb is
   -- general --
   constant int_imem_c              : boolean := false; -- true: use proc-internal IMEM, false: use external simulated IMEM (ext. mem A)
   constant int_dmem_c              : boolean := false; -- true: use proc-internal DMEM, false: use external simulated DMEM (ext. mem B)
-  constant imem_size_c             : natural := 32*1024; -- size in bytes of processor-internal IMEM / external mem A
+  constant imem_size_c             : natural := 8*1024; -- size in bytes of processor-internal IMEM / external mem A
   constant dmem_size_c             : natural := 8*1024; -- size in bytes of processor-internal DMEM / external mem B
   constant f_clock_c               : natural := 100000000; -- main clock in Hz
   constant baud0_rate_c            : natural := 19200; -- simulation UART0 (primary UART) baud rate
@@ -248,10 +248,11 @@ begin
     -- Atomic Memory Access - Reservation Set Granularity --
     AMO_RVS_GRANULARITY          => 4,             -- size in bytes, has to be a power of 2, min 4
     -- Internal Instruction memory --
-    MEM_INT_IMEM_EN              => int_imem_c ,   -- implement processor-internal instruction memory
+    MEM_INT_IMEM_EN              => true ,   -- implement processor-internal instruction memory
     MEM_INT_IMEM_SIZE            => imem_size_c,   -- size of processor-internal instruction memory in bytes
+    MEM_INT_IMEM_PREFETCH        => true,
     -- Internal Data memory --
-    MEM_INT_DMEM_EN              => int_dmem_c,    -- implement processor-internal data memory
+    MEM_INT_DMEM_EN              => true,    -- implement processor-internal data memory
     MEM_INT_DMEM_SIZE            => dmem_size_c,   -- size of processor-internal data memory in bytes
     -- Internal Cache memory --
     ICACHE_EN                    => false,         -- implement instruction cache

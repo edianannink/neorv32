@@ -786,6 +786,7 @@ package neorv32_package is
       -- Internal Instruction memory (IMEM) --
       MEM_INT_IMEM_EN              : boolean := false;
       MEM_INT_IMEM_SIZE            : natural := 16*1024;
+      MEM_INT_IMEM_PREFETCH        : boolean := false;
       -- Internal Data memory (DMEM) --
       MEM_INT_DMEM_EN              : boolean := false;
       MEM_INT_DMEM_SIZE            : natural := 8*1024;
@@ -1398,7 +1399,7 @@ x"32d69073",
 x"000046b7",
 x"32e69073",
 x"32079073",
-x"00000013",
+x"00000073",
 x"f120d073",
 x"32071073",
 x"000015b7",

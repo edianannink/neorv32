@@ -30,6 +30,7 @@ NEORV32.add_source_files([
     # hence subdir 'mem' is not picked by the previous pattern
     ROOT / ".." / "rtl" / "core" / "mem" / "neorv32_dmem.default.vhd",
     ROOT / ".." / "rtl" / "core" / "mem" / "neorv32_imem.default.vhd",
+    ROOT / ".." / "rtl" / "core" / "mem" / "neorv32_imem_prefetch.vhd",
     ROOT / "../../../" / "logic" / "iv" / "ram.vhd",
     ROOT / "../../../" / "logic" / "iv" / "multiply_shift.vhd",
     ROOT / "../../../" / "logic" / "iv" / "instruction_validator.vhd"

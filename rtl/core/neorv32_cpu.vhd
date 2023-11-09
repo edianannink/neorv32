@@ -95,7 +95,9 @@ entity neorv32_cpu is
     -- ecc --
     ecc_error_dmem_i : in std_logic_vector(1 downto 0);
     -- instruction validator --
-    illegal_instr: out std_logic
+    illegal_instr: out std_logic;
+    -- imem fetched --
+    imem_fetched_i: in std_logic
   );
 end neorv32_cpu;
 
@@ -265,7 +267,9 @@ begin
     ecc_error_regfile_i => ecc_regfile_error,
     ecc_error_dmem_i => ecc_error_dmem_i,
     -- instruction validator --
-    illegal_instr_o => illegal_instr
+    illegal_instr_o => illegal_instr,
+    -- imem fetched --
+    imem_fetched_i => imem_fetched_i
   );
 
   -- external CSR read-back --
