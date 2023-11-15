@@ -122,12 +122,13 @@ entity neorv32_cpu_control is
     be_load_i     : in  std_ulogic; -- bus error on load data access
     be_store_i    : in  std_ulogic; -- bus error on store data access
     -- ecc --
-    ecc_error_regfile_i: in std_logic_vector(1 downto 0);
-    ecc_error_dmem_i: in std_logic_vector(1 downto 0);
+    ecc_error_regfile_i: in std_ulogic_vector(1 downto 0);
+    ecc_error_dmem_i: in std_ulogic_vector(1 downto 0);
+    ecc_error_imem_i: in std_ulogic_vector(1 downto 0);
     -- instruction validator --
-    illegal_instr_o: out std_logic;
+    illegal_instr_o: out std_ulogic;
     -- imem fetched --
-    imem_fetched_i: in std_logic
+    imem_fetched_i: in std_ulogic
   );
 end neorv32_cpu_control;
 
@@ -359,7 +360,7 @@ architecture neorv32_cpu_control_rtl of neorv32_cpu_control is
   signal csr_rdata, xcsr_rdata : std_ulogic_vector(XLEN-1 downto 0);
 
   -- Instruction validator --
-  signal illegal_instr : std_logic;
+  signal illegal_instr : std_ulogic;
 
 begin
 
@@ -2303,11 +2304,11 @@ begin
     if rising_edge(clk_i) then
       cnt.inc <= (others => '0'); -- default
       -- base counters --
-      cnt.inc(0) <= cnt_event(hpmcnt_event_cy_c) and (not csr.mcountinhibit(0)) and (not debug_ctrl.running);
-      cnt.inc(2) <= cnt_event(hpmcnt_event_ir_c) and (not csr.mcountinhibit(2)) and (not debug_ctrl.running);
+      cnt.inc(0) <= cnt_event(hpmcnt_event_cy_c) and (not debug_ctrl.running);
+      cnt.inc(2) <= cnt_event(hpmcnt_event_ir_c) and (not debug_ctrl.running);
       -- HPM counters --
       for i in 3 to (hpm_num_c+3)-1 loop
-        cnt.inc(i) <= or_reduce_f(cnt_event and hpmevent.cfg(i)) and (not csr.mcountinhibit(i)) and (not debug_ctrl.running);
+        cnt.inc(i) <= or_reduce_f(cnt_event and hpmevent.cfg(i)) and (not debug_ctrl.running);
       end loop;
     end if;
   end process counter_event;
@@ -2339,8 +2340,11 @@ begin
   --cnt_event(hpmcnt_event_load_c)    <= '1' when (ctrl.lsu_req = '1') and (ctrl.lsu_rw = '0')                                  else '0'; -- load operation
   cnt_event(hpmcnt_event_iv) <= '1' when (illegal_instr = '1' and bus_rsp_i.ack = '1') else '0';
   
-  cnt_event(hpmcnt_event_store_c)   <= '1' when (ctrl.lsu_req = '1') and (ctrl.lsu_rw = '1')                                  else '0'; -- store operation
-  cnt_event(hpmcnt_event_wait_ls_c) <= '1' when (execute_engine.state = MEM_WAIT) and (execute_engine.state_prev2 = MEM_WAIT) else '0'; -- load/store memory wait cycle
+  --cnt_event(hpmcnt_event_store_c)   <= '1' when (ctrl.lsu_req = '1') and (ctrl.lsu_rw = '1')                                  else '0'; -- store operation
+  cnt_event(hpmcnt_event_ecc_se_imem) <= '1' when (ecc_error_imem_i(0) = '1') else '0';
+
+  --cnt_event(hpmcnt_event_wait_ls_c) <= '1' when (execute_engine.state = MEM_WAIT) and (execute_engine.state_prev2 = MEM_WAIT) else '0'; -- load/store memory wait cycle
+  cnt_event(hpmcnt_event_ecc_de_imem) <= '1' when (ecc_error_imem_i(1) = '1') else '0';
 
   cnt_event(hpmcnt_event_jump_c)    <= '1' when (execute_engine.state = BRANCH)   and (execute_engine.ir(instr_opcode_lsb_c+2) = '1') else '0'; -- jump (unconditional)
   cnt_event(hpmcnt_event_branch_c)  <= '1' when (execute_engine.state = BRANCH)   and (execute_engine.ir(instr_opcode_lsb_c+2) = '0') else '0'; -- branch (conditional, taken or not taken)

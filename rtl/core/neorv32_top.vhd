@@ -89,6 +89,7 @@ entity neorv32_top is
     MEM_INT_IMEM_EN              : boolean := false;                              -- implement processor-internal instruction memory
     MEM_INT_IMEM_SIZE            : natural := 16*1024;                            -- size of processor-internal instruction memory in bytes (use a power of 2)
     MEM_INT_IMEM_PREFETCH        : boolean := false;
+    MEM_INT_IMEM_SEC             : integer := 1;
 
     -- Internal Data memory (DMEM) --
     MEM_INT_DMEM_EN              : boolean := false;                              -- implement processor-internal data memory
@@ -250,7 +251,7 @@ entity neorv32_top is
     mext_irq_i     : in  std_ulogic := 'L'; -- machine external interrupt
 
     -- instruction validator --
-    illegal_instr: out std_logic
+    illegal_instr: out std_ulogic
   );
 end neorv32_top;
 
@@ -335,8 +336,8 @@ architecture neorv32_top_rtl of neorv32_top is
   end record;
   signal firq      : irq_t;
   signal mtime_irq : std_ulogic;
-  signal ecc_error_dmem_o : std_logic_vector(1 downto 0);
-  signal imem_fetched : std_logic;
+  signal ecc_error_dmem_o, ecc_error_imem_o : std_ulogic_vector(1 downto 0);
+  signal imem_fetched : std_ulogic;
 
 begin
 
@@ -538,6 +539,7 @@ begin
       dbus_rsp_i => cpu_d_rsp,
       -- ecc --
       ecc_error_dmem_i => ecc_error_dmem_o,
+      ecc_error_imem_i => ecc_error_imem_o,
       -- instruction validator
       illegal_instr => illegal_instr,
       -- imem fetched --
@@ -803,7 +805,8 @@ begin
     neorv32_imem_prefetch_inst: entity neorv32.neorv32_imem_prefetch
       generic map (
         IMEM_SIZE     => imem_size_c,
-        IMEM_AS_IROM  => imem_as_rom_c
+        IMEM_AS_IROM  => imem_as_rom_c,
+        IMEM_SEC      => MEM_INT_IMEM_SEC
       )
       port map (
         clk_i     => clk_i,
@@ -812,7 +815,8 @@ begin
         bus_rsp_o => imem_rsp,
         bus_req_o => imem_prefetch_req,
         bus_rsp_i => xbus_rsp,
-        fetched_o => imem_fetched
+        fetched_o => imem_fetched,
+        ecc_error_o => ecc_error_imem_o
       );
     end generate;
 

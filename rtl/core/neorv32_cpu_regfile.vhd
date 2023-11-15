@@ -72,7 +72,7 @@ entity neorv32_cpu_regfile is
     rs3_o  : out std_ulogic_vector(XLEN-1 downto 0); -- rs3
     rs4_o  : out std_ulogic_vector(XLEN-1 downto 0); -- rs4
     -- ECC error --
-    ecc_error_o : out std_logic_vector(1 downto 0)
+    ecc_error_o : out std_ulogic_vector(1 downto 0)
   );
 end neorv32_cpu_regfile;
 
@@ -95,9 +95,9 @@ architecture neorv32_cpu_regfile_rtl of neorv32_cpu_regfile is
   signal opd_addr : std_ulogic_vector(4 downto 0); -- rs4 address
 
   -- ECC signals --
-  signal ecc_enc_out : std_logic_vector(38 downto 0);
-  signal ecc_dec_opa_out, ecc_dec_opb_out, ecc_dec_opc_out, ecc_dec_opd_out: std_logic_vector(31 downto 0);
-  signal ecc_dec_opa_err_out, ecc_dec_opb_err_out, ecc_dec_opc_err_out, ecc_dec_opd_err_out: std_logic_vector(1 downto 0);
+  signal ecc_enc_out : std_ulogic_vector(38 downto 0);
+  signal ecc_dec_opa_out, ecc_dec_opb_out, ecc_dec_opc_out, ecc_dec_opd_out: std_ulogic_vector(31 downto 0);
+  signal ecc_dec_opa_err_out, ecc_dec_opb_err_out, ecc_dec_opc_err_out, ecc_dec_opd_err_out: std_ulogic_vector(1 downto 0);
   
   component prim_secded_39_32_enc
   port (

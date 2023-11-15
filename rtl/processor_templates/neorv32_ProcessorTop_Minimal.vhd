@@ -44,8 +44,9 @@ entity neorv32_ProcessorTop_Minimal is
     CLOCK_FREQUENCY       : natural := 10000000;      -- clock frequency of clk_i in Hz
     -- Internal Instruction memory --
     MEM_INT_IMEM_EN       : boolean := true;          -- implement processor-internal instruction memory
-    MEM_INT_IMEM_SIZE     : natural := 8*1024;        -- size of processor-internal instruction memory in bytes
+    MEM_INT_IMEM_SIZE     : natural := 16*1024;       -- size of processor-internal instruction memory in bytes
     MEM_INT_IMEM_PREFETCH : boolean := true;          -- fetch from external memory and store on internal memory
+    MEM_INT_IMEM_SEC      : integer := 1;             -- single error correction 0 = disabled, 1 = enabled
     -- Internal Data memory --
     MEM_INT_DMEM_EN       : boolean := true;          -- implement processor-internal data memory
     MEM_INT_DMEM_SIZE     : natural := 8*1024;        -- size of processor-internal data memory in bytes
@@ -115,6 +116,7 @@ begin
     MEM_INT_IMEM_EN              => MEM_INT_IMEM_EN,        -- implement processor-internal instruction memory
     MEM_INT_IMEM_SIZE            => MEM_INT_IMEM_SIZE,      -- size of processor-internal instruction memory in bytes
     MEM_INT_IMEM_PREFETCH        => MEM_INT_IMEM_PREFETCH,  -- fetch from external memory and store on internal memory
+    MEM_INT_IMEM_SEC             => MEM_INT_IMEM_SEC,       -- single error correction 0 = disabled, 1 = enabled
     -- Internal Data memory --
     MEM_INT_DMEM_EN              => MEM_INT_DMEM_EN,   -- implement processor-internal data memory
     MEM_INT_DMEM_SIZE            => MEM_INT_DMEM_SIZE, -- size of processor-internal data memory in bytes

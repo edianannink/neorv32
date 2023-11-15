@@ -61,9 +61,6 @@ architecture neorv32_dmem_rtl of neorv32_dmem is
   -- read data --
   signal mem_ram_b0_rd, mem_ram_b1_rd, mem_ram_b2_rd, mem_ram_b3_rd : std_ulogic_vector(12 downto 0);
 
-  -- read data after ECC decode --
-  signal mem_ram_b0_ecc_rd, mem_ram_b1_ecc_rd, mem_ram_b2_ecc_rd, mem_ram_b3_ecc_rd : std_ulogic_vector(7 downto 0);
-
   component prim_secded_13_8_enc
   port (
     data_i : in std_ulogic_vector(7 downto 0);
@@ -81,10 +78,8 @@ architecture neorv32_dmem_rtl of neorv32_dmem is
   end component;
 
   signal ecc_enc_byte0_out, ecc_enc_byte1_out, ecc_enc_byte2_out, ecc_enc_byte3_out : std_ulogic_vector(12 downto 0);
-
   signal ecc_error_byte0, ecc_error_byte1, ecc_error_byte2, ecc_error_byte3 : std_ulogic_vector(1 downto 0);
 
-  signal ecc_error_out : std_logic_vector(1 downto 0);
 
 begin
 
@@ -140,9 +135,6 @@ begin
     end if;
   end process bus_feedback;
 
-  -- pack --
-  rdata <= mem_ram_b3_ecc_rd & mem_ram_b2_ecc_rd & mem_ram_b1_ecc_rd & mem_ram_b0_ecc_rd;
-
   -- output gate --
   bus_rsp_o.data <= rdata when (rden = '1') else (others => '0');
 
@@ -177,7 +169,7 @@ begin
   prim_secded_13_8_dec_inst_byte0: prim_secded_13_8_dec
     port map (
       data_i     => mem_ram_b0_rd,
-      data_o     => mem_ram_b0_ecc_rd,
+      data_o     => rdata(7 downto 0),
       syndrome_o => open,
       err_o      => ecc_error_byte0
     );
@@ -185,7 +177,7 @@ begin
   prim_secded_13_8_dec_inst_byte1: prim_secded_13_8_dec
     port map (
       data_i     => mem_ram_b1_rd,
-      data_o     => mem_ram_b1_ecc_rd,
+      data_o     => rdata(15 downto 8),
       syndrome_o => open,
       err_o      => ecc_error_byte1
     );
@@ -193,7 +185,7 @@ begin
   prim_secded_13_8_dec_inst_byte2: prim_secded_13_8_dec
     port map (
       data_i     => mem_ram_b2_rd,
-      data_o     => mem_ram_b2_ecc_rd,
+      data_o     => rdata(23 downto 16),
       syndrome_o => open,
       err_o      => ecc_error_byte2
     );
@@ -201,21 +193,12 @@ begin
   prim_secded_13_8_dec_inst_byte3: prim_secded_13_8_dec
     port map (
       data_i     => mem_ram_b3_rd,
-      data_o     => mem_ram_b3_ecc_rd,
+      data_o     => rdata(31 downto 24),
       syndrome_o => open,
       err_o      => ecc_error_byte3
     );
 
-  ecc_error_out(0) <= ecc_error_byte0(0) when (bus_req_i.ben(0) = '1') else '0' or 
-                      ecc_error_byte1(0) when (bus_req_i.ben(1) = '1') else '0' or  
-                      ecc_error_byte2(0) when (bus_req_i.ben(2) = '1') else '0' or  
-                      ecc_error_byte3(0) when (bus_req_i.ben(3) = '1') else '0';
-
-  ecc_error_out(1) <= ecc_error_byte0(1) when (bus_req_i.ben(0) = '1') else '0' or 
-                      ecc_error_byte1(1) when (bus_req_i.ben(1) = '1') else '0' or  
-                      ecc_error_byte2(1) when (bus_req_i.ben(2) = '1') else '0' or  
-                      ecc_error_byte3(1) when (bus_req_i.ben(3) = '1') else '0';
-
-  ecc_error_o <= ecc_error_out when (rden = '1') else (others => '0');
+  ecc_error_o(0) <= ecc_error_byte0(0) or ecc_error_byte1(0) or ecc_error_byte2(0) or ecc_error_byte3(0) when (rden = '1') else '0';
+  ecc_error_o(1) <= ecc_error_byte0(1) or ecc_error_byte1(1) or ecc_error_byte2(1) or ecc_error_byte3(1) when (rden = '1') else '0';
 
 end neorv32_dmem_rtl;

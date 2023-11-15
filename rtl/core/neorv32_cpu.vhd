@@ -93,11 +93,12 @@ entity neorv32_cpu is
     dbus_req_o : out bus_req_t; -- request bus
     dbus_rsp_i : in  bus_rsp_t; -- response bus
     -- ecc --
-    ecc_error_dmem_i : in std_logic_vector(1 downto 0);
+    ecc_error_dmem_i : in std_ulogic_vector(1 downto 0);
+    ecc_error_imem_i : in std_ulogic_vector(1 downto 0);
     -- instruction validator --
-    illegal_instr: out std_logic;
+    illegal_instr: out std_ulogic;
     -- imem fetched --
-    imem_fetched_i: in std_logic
+    imem_fetched_i: in std_ulogic
   );
 end neorv32_cpu;
 
@@ -140,7 +141,7 @@ architecture neorv32_cpu_rtl of neorv32_cpu is
   signal next_pc      : std_ulogic_vector(XLEN-1 downto 0); -- next pc (for next executed instruction)
   signal pmp_ex_fault : std_ulogic; -- PMP instruction fetch fault
   signal pmp_rw_fault : std_ulogic; -- PMP read/write access fault
-  signal ecc_regfile_error : std_logic_vector(1 downto 0); -- ECC error in CPU register file
+  signal ecc_regfile_error : std_ulogic_vector(1 downto 0); -- ECC error in CPU register file
 
 begin
 
@@ -266,6 +267,7 @@ begin
     -- ecc errors --
     ecc_error_regfile_i => ecc_regfile_error,
     ecc_error_dmem_i => ecc_error_dmem_i,
+    ecc_error_imem_i => ecc_error_imem_i,
     -- instruction validator --
     illegal_instr_o => illegal_instr,
     -- imem fetched --

@@ -162,13 +162,13 @@ int main() {
 
   // print HPM counter values (low word only)
   neorv32_uart0_printf("\nHPM results:\n");
-  if (hpm_num >  0) { neorv32_uart0_printf("HPM03.low (DMEM ECC sed)    = %u\n", (uint32_t)neorv32_cpu_csr_read(CSR_MHPMCOUNTER3));  }
-  if (hpm_num >  1) { neorv32_uart0_printf("HPM04.low (DMEM ECC ded)    = %u\n", (uint32_t)neorv32_cpu_csr_read(CSR_MHPMCOUNTER4));  }
-  if (hpm_num >  2) { neorv32_uart0_printf("HPM05.low (Regfile ECC sed) = %u\n", (uint32_t)neorv32_cpu_csr_read(CSR_MHPMCOUNTER5));  }
-  if (hpm_num >  3) { neorv32_uart0_printf("HPM06.low (Regfile ECC ded) = %u\n", (uint32_t)neorv32_cpu_csr_read(CSR_MHPMCOUNTER6));  }
-  if (hpm_num >  4) { neorv32_uart0_printf("HPM07.low (IV flag)         = %u\n", (uint32_t)neorv32_cpu_csr_read(CSR_MHPMCOUNTER7));  }
-  if (hpm_num >  5) { neorv32_uart0_printf("HPM08.low (MEM stores)      = %u\n", (uint32_t)neorv32_cpu_csr_read(CSR_MHPMCOUNTER8));  }
-  if (hpm_num >  6) { neorv32_uart0_printf("HPM09.low (MEM wait)        = %u\n", (uint32_t)neorv32_cpu_csr_read(CSR_MHPMCOUNTER9));  }
+  if (hpm_num >  0) { neorv32_uart0_printf("HPM03.low (IMEM ECC sed)    = %u\n", (uint32_t)neorv32_cpu_csr_read(CSR_MHPMCOUNTER3));  }
+  if (hpm_num >  1) { neorv32_uart0_printf("HPM04.low (IMEM ECC ded)    = %u\n", (uint32_t)neorv32_cpu_csr_read(CSR_MHPMCOUNTER4));  }
+  if (hpm_num >  2) { neorv32_uart0_printf("HPM05.low (DMEM ECC sed)    = %u\n", (uint32_t)neorv32_cpu_csr_read(CSR_MHPMCOUNTER5));  }
+  if (hpm_num >  3) { neorv32_uart0_printf("HPM06.low (DMEM ECC ded)    = %u\n", (uint32_t)neorv32_cpu_csr_read(CSR_MHPMCOUNTER6));  }
+  if (hpm_num >  4) { neorv32_uart0_printf("HPM07.low (Regfile ECC sed) = %u\n", (uint32_t)neorv32_cpu_csr_read(CSR_MHPMCOUNTER7));  }
+  if (hpm_num >  5) { neorv32_uart0_printf("HPM08.low (Regfile ECC ded) = %u\n", (uint32_t)neorv32_cpu_csr_read(CSR_MHPMCOUNTER8));  }
+  if (hpm_num >  6) { neorv32_uart0_printf("HPM09.low (IV flag)         = %u\n", (uint32_t)neorv32_cpu_csr_read(CSR_MHPMCOUNTER9));  }
   if (hpm_num >  7) { neorv32_uart0_printf("HPM10.low (jumps)           = %u\n", (uint32_t)neorv32_cpu_csr_read(CSR_MHPMCOUNTER10)); }
   if (hpm_num >  8) { neorv32_uart0_printf("HPM11.low (cond. branches)  = %u\n", (uint32_t)neorv32_cpu_csr_read(CSR_MHPMCOUNTER11)); }
   if (hpm_num >  9) { neorv32_uart0_printf("HPM12.low (taken branches)  = %u\n", (uint32_t)neorv32_cpu_csr_read(CSR_MHPMCOUNTER12)); }

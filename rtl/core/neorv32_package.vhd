@@ -151,7 +151,10 @@ package neorv32_package is
   -- Internal Memory Types ------------------------------------------------------------------
   -- -------------------------------------------------------------------------------------------
   type mem32_t is array (natural range <>) of std_ulogic_vector(31 downto 0); -- memory with 32-bit entries
+  type mem16_t is array (natural range <>) of std_ulogic_vector(15 downto 0); -- memory with 16-bit entries
   type mem8_t  is array (natural range <>) of std_ulogic_vector(07 downto 0); -- memory with 8-bit entries
+  
+  type mem15_t  is array (natural range <>) of std_ulogic_vector(14 downto 0); -- memory with 15-bit entries
   type mem13_t  is array (natural range <>) of std_ulogic_vector(12 downto 0); -- memory with 13-bit entries
 
   -- Internal Bus Interface -----------------------------------------------------------------
@@ -705,13 +708,15 @@ package neorv32_package is
   --constant hpmcnt_event_wait_ii_c   : natural := 5;  -- Instruction issue wait cycle
   --constant hpmcnt_event_wait_mc_c   : natural := 6;  -- Multi-cycle ALU-operation wait cycle
   --constant hpmcnt_event_load_c      : natural := 7;  -- Load operation
-  constant hpmcnt_event_ecc_se_dmem   : natural := 3; -- Data memory single error
-  constant hpmcnt_event_ecc_de_dmem   : natural := 4; -- Data memory double error
-  constant hpmcnt_event_ecc_se_regfile: natural := 5; -- Register file single error
-  constant hpmcnt_event_ecc_de_regfile: natural := 6; -- Register file double error
-  constant hpmcnt_event_iv            : natural := 7; -- Instruction validator detecting an error
-  constant hpmcnt_event_store_c       : natural := 8;  -- Store operation
-  constant hpmcnt_event_wait_ls_c     : natural := 9;  -- Load/store memory wait cycle
+  --constant hpmcnt_event_store_c       : natural := 8;  -- Store operation
+  --constant hpmcnt_event_wait_ls_c     : natural := 9;  -- Load/store memory wait cycle
+  constant hpmcnt_event_ecc_se_imem   : natural := 3; -- Register file single error
+  constant hpmcnt_event_ecc_de_imem   : natural := 4; -- Register file double error
+  constant hpmcnt_event_ecc_se_dmem   : natural := 5; -- Data memory single error
+  constant hpmcnt_event_ecc_de_dmem   : natural := 6; -- Data memory double error
+  constant hpmcnt_event_ecc_se_regfile: natural := 7; -- Register file single error
+  constant hpmcnt_event_ecc_de_regfile: natural := 8; -- Register file double error
+  constant hpmcnt_event_iv            : natural := 9; -- Instruction validator detecting an error
   constant hpmcnt_event_jump_c        : natural := 10; -- Unconditional jump
   constant hpmcnt_event_branch_c      : natural := 11; -- Conditional branch (taken or not taken)
   constant hpmcnt_event_tbranch_c     : natural := 12; -- Conditional taken branch
@@ -2284,7 +2289,7 @@ x"73746c75",
 x"00000a3a",
 x"304d5048",
 x"6f6c2e33",
-x"44282077",
+x"49282077",
 x"204d454d",
 x"20434345",
 x"29646573",
@@ -2293,7 +2298,7 @@ x"7525203d",
 x"0000000a",
 x"304d5048",
 x"6f6c2e34",
-x"44282077",
+x"49282077",
 x"204d454d",
 x"20434345",
 x"29646564",
@@ -2302,6 +2307,24 @@ x"7525203d",
 x"0000000a",
 x"304d5048",
 x"6f6c2e35",
+x"44282077",
+x"204d454d",
+x"20434345",
+x"29646573",
+x"20202020",
+x"7525203d",
+x"0000000a",
+x"304d5048",
+x"6f6c2e36",
+x"44282077",
+x"204d454d",
+x"20434345",
+x"29646564",
+x"20202020",
+x"7525203d",
+x"0000000a",
+x"304d5048",
+x"6f6c2e37",
 x"52282077",
 x"69666765",
 x"4520656c",
@@ -2310,7 +2333,7 @@ x"20296465",
 x"7525203d",
 x"0000000a",
 x"304d5048",
-x"6f6c2e36",
+x"6f6c2e38",
 x"52282077",
 x"69666765",
 x"4520656c",
@@ -2319,28 +2342,10 @@ x"20296465",
 x"7525203d",
 x"0000000a",
 x"304d5048",
-x"6f6c2e37",
+x"6f6c2e39",
 x"49282077",
 x"6c662056",
 x"20296761",
-x"20202020",
-x"20202020",
-x"7525203d",
-x"0000000a",
-x"304d5048",
-x"6f6c2e38",
-x"4d282077",
-x"73204d45",
-x"65726f74",
-x"20202973",
-x"20202020",
-x"7525203d",
-x"0000000a",
-x"304d5048",
-x"6f6c2e39",
-x"4d282077",
-x"77204d45",
-x"29746961",
 x"20202020",
 x"20202020",
 x"7525203d",
@@ -2576,4 +2581,5 @@ x"33323130",
 x"37363534",
 x"00003938"
 );
+
 end neorv32_application_image;
