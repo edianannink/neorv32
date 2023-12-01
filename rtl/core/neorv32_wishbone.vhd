@@ -116,9 +116,9 @@ begin
   -- Configuration Info ---------------------------------------------------------------------
   -- -------------------------------------------------------------------------------------------
   assert false report
-    "NEORV32 PROCESSOR CONFIG NOTE: Ext. Bus Interface - " &
+    "[NEORV32] Ext. Bus Interface (WISHBONE) - " &
     cond_sel_string_f(PIPE_MODE, "PIPELINED", "CLASSIC/STANDARD") & " Wishbone protocol, " &
-    cond_sel_string_f(boolean(BUS_TIMEOUT /= 0), "auto-timeout (" & integer'image(BUS_TIMEOUT) & " cycles), ", "NO auto-timeout, ") &
+    cond_sel_string_f(boolean(BUS_TIMEOUT /= 0), "auto-timeout, ", "NO auto-timeout, ") &
     cond_sel_string_f(BIG_ENDIAN, "BIG", "LITTLE") & "-endian byte order, " &
     cond_sel_string_f(async_rx_c, "ASYNC ", "registered ") & "RX, " &
     cond_sel_string_f(ASYNC_TX, "ASYNC ", "registered ") & "TX"
@@ -126,11 +126,11 @@ begin
 
   -- async RX override warning --
   assert not ((ASYNC_RX = true) and (async_rx_c = false)) report
-    "NEORV32 PROCESSOR CONFIG WARNING! Ext. Bus Interface - Non-pipelined/standard mode requires sync RX (auto-disabling async RX)." severity warning;
+    "[NEORV32] Ext. Bus Interface - Non-pipelined/standard mode requires sync RX (auto-disabling async RX)." severity warning;
 
   -- zero timeout warning --
   assert not (BUS_TIMEOUT = 0) report
-    "NEORV32 PROCESSOR CONFIG WARNING! Ext. Bus Interface - NO auto-timeout defined; can cause permanent CPU stall!" severity warning;
+    "[NEORV32] Ext. Bus Interface - NO auto-timeout defined; can cause permanent CPU stall!" severity warning;
 
 
   -- Bus Arbiter -----------------------------------------------------------------------------

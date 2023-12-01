@@ -62,6 +62,10 @@ enum NEORV32_CSR_enum {
   CSR_MCYCLECFG      = 0x321, /**< 0x321 - mcyclecfg:     Machine cycle counter privilege mode filtering - low word */
   CSR_MINSTRETCFG    = 0x322, /**< 0x322 - minstretcfg:   Machine instret counter privilege mode filtering - low word */
 
+  /* machine configuration */
+  CSR_MENVCFG        = 0x30a, /**< 0x30a - menvcfg:  Machine environment configuration register - low word */
+  CSR_MENVCFGH       = 0x31a, /**< 0x31a - menvcfgh: Machine environment configuration register - high word */
+
   /* hardware performance monitors - event configuration */
   CSR_MHPMEVENT3     = 0x323, /**< 0x323 - mhpmevent3:  Machine hardware performance monitor event selector 3  */
   CSR_MHPMEVENT4     = 0x324, /**< 0x324 - mhpmevent4:  Machine hardware performance monitor event selector 4  */
@@ -116,9 +120,7 @@ enum NEORV32_CSR_enum {
   CSR_TSELECT        = 0x7a0, /**< 0x7a0 - tselect:  Trigger select */
   CSR_TDATA1         = 0x7a1, /**< 0x7a1 - tdata1:   Trigger data register 0 */
   CSR_TDATA2         = 0x7a2, /**< 0x7a2 - tdata2:   Trigger data register 1 */
-  CSR_TDATA3         = 0x7a3, /**< 0x7a3 - tdata3:   Trigger data register 2 */
   CSR_TINFO          = 0x7a4, /**< 0x7a4 - tinfo:    Trigger info */
-  CSR_TCONTROL       = 0x7a5, /**< 0x7a5 - tcontrol: Trigger control */
 
   /* CPU debug mode CSRs - not accessible by software running outside of debug mode */
   CSR_DCSR           = 0x7b0, /**< 0x7b0 - dcsr:      Debug status and control register */
@@ -321,9 +323,9 @@ enum NEORV32_CSR_MIE_enum {
  * CPU <b>mip</b> CSR (r/c): Machine interrupt pending
  **************************************************************************/
 enum NEORV32_CSR_MIP_enum {
-  CSR_MIP_MSIP    =  3, /**< CPU mip CSR  (3): MSIP - Machine software interrupt pending (r/c) */
-  CSR_MIP_MTIP    =  7, /**< CPU mip CSR  (7): MTIP - Machine timer interrupt pending (r/c) */
-  CSR_MIP_MEIP    = 11, /**< CPU mip CSR (11): MEIP - Machine external interrupt pending (r/c) */
+  CSR_MIP_MSIP    =  3, /**< CPU mip CSR  (3): MSIP - Machine software interrupt pending (r/-) */
+  CSR_MIP_MTIP    =  7, /**< CPU mip CSR  (7): MTIP - Machine timer interrupt pending (r/-) */
+  CSR_MIP_MEIP    = 11, /**< CPU mip CSR (11): MEIP - Machine external interrupt pending (r/-) */
 
   /* NEORV32-specific extension: Fast Interrupt Requests (FIRQ) */
   CSR_MIP_FIRQ0P  = 16, /**< CPU mip CSR (16): FIRQ0P - Fast interrupt channel 0 pending (r/c) */
@@ -386,6 +388,7 @@ enum NEORV32_CSR_XISA_enum {
   CSR_MXISA_IS_SIM    = 20, /**< CPU mxisa CSR (20): this might be a simulation when set (r/-)*/
 
   // Tuning options
+  CSR_MXISA_RFHWRST   = 29, /**< CPU mxisa CSR (29): Register file has full hardware reset (r/-)*/
   CSR_MXISA_FASTMUL   = 30, /**< CPU mxisa CSR (30): DSP-based multiplication (M extensions only) (r/-)*/
   CSR_MXISA_FASTSHIFT = 31  /**< CPU mxisa CSR (31): parallel logic for shifts (barrel shifters) (r/-)*/
 };

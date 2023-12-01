@@ -62,6 +62,15 @@ end neorv32_icache;
 
 architecture neorv32_icache_rtl of neorv32_icache is
 
+  -- make sure caches sizes are a power of two --
+  constant nblocks_valid_c : boolean := is_power_of_two_f(ICACHE_NUM_BLOCKS);
+  constant nblocks_pow2_c  : natural := 2**index_size_f(ICACHE_NUM_BLOCKS);
+  constant nblocks_c       : natural := cond_sel_natural_f(nblocks_valid_c, ICACHE_NUM_BLOCKS, nblocks_pow2_c);
+  --
+  constant block_size_valid_c : boolean := is_power_of_two_f(ICACHE_BLOCK_SIZE);
+  constant block_size_pow2_c  : natural := 2**index_size_f(ICACHE_BLOCK_SIZE);
+  constant block_size_c       : natural := cond_sel_natural_f(block_size_valid_c, ICACHE_BLOCK_SIZE, block_size_pow2_c);
+
   -- cache layout --
   constant cache_offset_size_c : natural := index_size_f(ICACHE_BLOCK_SIZE/4); -- offset addresses full 32-bit words
 
@@ -74,6 +83,7 @@ architecture neorv32_icache_rtl of neorv32_icache is
   );
   port (
     -- global control --
+    rstn_i       : in  std_ulogic; -- global reset, async, low-active
     clk_i        : in  std_ulogic; -- global clock, rising edge
     clear_i      : in  std_ulogic; -- invalidate whole cache
     hit_o        : out std_ulogic; -- hit access
@@ -125,12 +135,8 @@ begin
 
   -- Sanity Checks --------------------------------------------------------------------------
   -- -------------------------------------------------------------------------------------------
-  assert not (is_power_of_two_f(ICACHE_NUM_BLOCKS) = false) report
-    "NEORV32 PROCESSOR CONFIG ERROR! i-cache number of blocks <ICACHE_NUM_BLOCKS> has to be a power of 2." severity error;
-  assert not (is_power_of_two_f(ICACHE_BLOCK_SIZE) = false) report
-    "NEORV32 PROCESSOR CONFIG ERROR! i-cache block size <ICACHE_BLOCK_SIZE> has to be a power of 2." severity error;
-  assert not ((is_power_of_two_f(ICACHE_NUM_SETS) = false)) report
-    "NEORV32 PROCESSOR CONFIG ERROR! i-cache associativity <ICACHE_NUM_SETS> has to be a power of 2." severity error;
+  assert not ((nblocks_valid_c = false) or (block_size_valid_c = false)) report
+    "[NEORV32] Auto-adjusting invalid i-cache size configuration(s)." severity warning;
 
 
   -- Control Engine FSM Sync ----------------------------------------------------------------
@@ -277,12 +283,13 @@ begin
   -- -------------------------------------------------------------------------------------------
   neorv32_icache_memory_inst: neorv32_icache_memory
   generic map (
-    ICACHE_NUM_BLOCKS => ICACHE_NUM_BLOCKS,
-    ICACHE_BLOCK_SIZE => ICACHE_BLOCK_SIZE,
+    ICACHE_NUM_BLOCKS => nblocks_c,
+    ICACHE_BLOCK_SIZE => block_size_c,
     ICACHE_NUM_SETS   => ICACHE_NUM_SETS
   )
   port map (
     -- global control --
+    rstn_i       => rstn_i,
     clk_i        => clk_i,
     clear_i      => cache.clear,
     hit_o        => cache.hit,
@@ -358,6 +365,7 @@ entity neorv32_icache_memory is
   );
   port (
     -- global control --
+    rstn_i       : in  std_ulogic; -- global reset, async, low-active
     clk_i        : in  std_ulogic; -- global clock, rising edge
     clear_i      : in  std_ulogic; -- invalidate whole cache
     hit_o        : out std_ulogic; -- hit access
@@ -441,9 +449,13 @@ begin
 
   -- Cache Access History -------------------------------------------------------------------
   -- -------------------------------------------------------------------------------------------
-  access_history: process(clk_i)
+  access_history: process(rstn_i, clk_i)
   begin
-    if rising_edge(clk_i) then
+    if (rstn_i = '0') then
+      history.re_ff          <= '0';
+      history.last_used_set  <= (others => '0');
+      history.to_be_replaced <= '0';
+    elsif rising_edge(clk_i) then
       history.re_ff <= host_re_i;
       if (clear_i = '1') then -- invalidate cache
         history.last_used_set <= (others => '1');
@@ -460,9 +472,13 @@ begin
 
   -- Status Flag Memory ---------------------------------------------------------------------
   -- -------------------------------------------------------------------------------------------
-  status_memory: process(clk_i)
+  status_memory: process(rstn_i, clk_i)
   begin
-    if rising_edge(clk_i) then
+    if (rstn_i = '0') then
+      valid_flag_s0 <= (others => '0');
+      valid_flag_s1 <= (others => '0');
+      valid         <= (others => '0');
+    elsif rising_edge(clk_i) then
       -- write access --
       if (clear_i = '1') then -- invalidate cache
         valid_flag_s0 <= (others => '0');
@@ -485,7 +501,7 @@ begin
   -- -------------------------------------------------------------------------------------------
   tag_memory: process(clk_i)
   begin
-    if rising_edge(clk_i) then
+    if rising_edge(clk_i) then -- no reset to allow inferring of blockRAM
       if (ctrl_en_i = '1') and (ctrl_we_i = '1') then -- write access
         if (set_select = '0') then
           tag_mem_s0(to_integer(unsigned(cache_index))) <= ctrl_acc_addr.tag;
@@ -517,7 +533,7 @@ begin
   -- -------------------------------------------------------------------------------------------
   cache_mem_access: process(clk_i)
   begin
-    if rising_edge(clk_i) then
+    if rising_edge(clk_i) then -- no reset to allow inferring of blockRAM
       if (ctrl_we_i = '1') then -- write access from control (full-word)
         if (set_select = '0') or (ICACHE_NUM_SETS = 1) then
           cache_data_memory_s0(to_integer(unsigned(cache_addr))) <= ctrl_wstat_i & ctrl_wdata_i;

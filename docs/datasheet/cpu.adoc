@@ -1,9 +1,9 @@
 :sectnums:
 == NEORV32 Central Processing Unit (CPU)
 
-The NEORV32 CPU is an area-optimized RISC-V core implementing the `rv32iZicsr` base ISA and supporting
-several additional/optional ISA extensions. The CPU's micro architecture is based on a von-Neumann machine build
-upon a mixture of multi-cycle and pipelined execution schemes.
+The NEORV32 CPU is an area-optimized RISC-V core implementing the `rv32i_zicsr_zifencei` base (privileged) ISA and
+supporting several additional/optional ISA extensions. The CPU's micro architecture is based on a von-Neumann
+machine build upon a mixture of multi-cycle and pipelined execution schemes.
 
 [NOTE]
 This chapter assumes that the reader is familiar with the official
@@ -87,37 +87,65 @@ caused by speculative execution (like Spectre or Meltdown).
 :sectnums:
 ==== CPU Register File
 
-The data register file contains the general purpose "`x`" architecture registers. For the `rv32i` ISA there are 32 32-bit registers
-and for the `rv32e` ISA there are 16 32-bit registers. Register zero (`x0`/`zero`) always read as zero and any write access to it
-is discarded.
+The data register file contains the general purpose architecture registers `x0` to `x31`. For the `rv32e` ISA only the lower
+16 registers are implemented. Register zero (`x0`/`zero`) always read as zero and any write access to it has no effect.
+Up to four individual synchronous read ports allow to fetch up to 4 register operands at once. The write and read accesses
+are mutually exclusive as they happen in separate cycles. Hence, there is no need to consider things like "read-during-write"
+behavior.
 
-The register file is implemented as synchronous memory with synchronous read and write accesses. Register `zero` is also mapped to
-a _physical memory location_ in the register file. By this, there is no need to add a further multiplexer to "insert" zero if reading
-from register `zero` reducing logic requirements and shortening the critical path. Furthermore, the whole register file can be mapped
-entirely to FPGA block RAM.
+The register file provides two different implementation options configured via the top's `REGFILE_HW_RST` generic.
 
-The memory of the register file uses two access ports: a read-only port for reading register `rs2` (second source operand) and a
-read/write port for reading register `rs1` (first source operand) or for writing processing results to register `rd` (destination register).
-Hence, a simple dual-port RAM can be used to implement the entire register file. From a functional point of view, read and write accesses to
-the register file do never occur in the same clock cycle, so no bypass logic is required at all.
+* `REGFILE_HW_RST = false` (default): In this configuration the register file is implemented as plain memory array without a
+dictated hardware reset. This architecture allows to infer FPGA block RAM for the entire register file resulting in minimal
+logic utilization and optimal timing.
+* `REGFILE_HW_RST = true`: This configuration is based on individual FFs that do provide a dedicated hardware reset.
+Hence, the register cannot be mapped to FPGA block RAM. This optional should only be selected if the application requires a
+reset of the register file (e.g. for security reasons) or if the design shall be synthesized for an **ASIC** implementation.
+
+The state of this configuration generic can be checked by software via the <<_mxisa>> CSR.
+
+.FPGA Implementation
+[WARNING]
+Enabling the `REGFILE_HW_RST` option for FPGA implementation is not recommended as this will massively increase the amount
+of required logic resources.
+
+.Implementation of the `zero` Register within FPGA Block RAM
+[NOTE]
+Register `zero` is also mapped to a _physical memory location_ within the register file's block RAM. By this, there is no need
+to add a further multiplexer to "insert" zero if reading from register `zero` reducing logic requirements and shortening the
+critical path. However, this also requires that the physical storage bits of register `zero` are explicitly initialized (set
+to zero) by the hardware. This is done transparently by the CPU control requiring no additional processing overhead.
+
+.Block RAM Ports
+[NOTE]
+The default register file configuration uses two access ports: a read-only port for reading register `rs2` (second source operand)
+and a read/write port for reading register `rs1` (first source operand) and for writing processing results to register `rd`
+(destination register). Hence, a simple dual-port RAM can be used to implement the entire register file. From a functional point
+of view, read and write accesses to the register file do never occur in the same clock cycle, so no bypass logic is required at all.
 
 
 :sectnums:
 ==== CPU Arithmetic Logic Unit
 
-The arithmetic/logic unit (ALU) is used for processing data from the register file and also for memory and branch address computations.
-All simple <<_i_isa_extension>> processing operations (`add`, `and`, ...) are implemented as combinatorial logic requiring only a single cycle to
-complete. More sophisticated instructions (shift operations from the base ISA and all further ISA extensions) are processed by so-called
-"ALU co-processors".
+The arithmetic/logic unit (ALU) is used for actual data processing as well as generating memory and branch addresses.
+All "simple" <<_i_isa_extension>> computational instructions (like `add` and `or`) are implemented as plain combinatorial logic
+requiring only a single cycle to complete. More sophisticated instructions like shift operations or multiplications are processed
+by so-called "ALU co-processors".
 
-The co-processors are implemented as iterative units that require several cycles to complete processing. Besides the base ISA's shift instructions,
-the co-processors are used to implement all further processing-based ISA extensions (e.g. <<_m_isa_extension>> and
-<<_b_isa_extension>>).
+The co-processors are implemented as iterative units that require several cycles to complete processing. Besides the base ISA's
+shift instructions, the co-processors are used to implement all further processing-based ISA extensions (e.g. <<_m_isa_extension>>
+and <<_b_isa_extension>>).
 
 .Multi-Cycle Execution Monitor
 [NOTE]
-The CPU control system will raise an illegal instruction exception if a multi-cycle functional unit (like the <<_custom_functions_unit_cfu>>)
+The CPU control will raise an illegal instruction exception if a multi-cycle functional unit (like the <<_custom_functions_unit_cfu>>)
 does not complete processing in a bound amount of time (configured via the package's `monitor_mc_tmo_c` constant; default = 512 clock cycles).
+
+.Tuning Options
+[TIP]
+The ALU architecture can be tuned for an application-specific area-vs-performance trade-off. The `FAST_MUL_EN` and `FAST_SHIFT_EN`
+generics can be used to implement performance-optimized barrel shifters and DSP blocks, respectively. See sections <<_i_isa_extension>>,
+<<_b_isa_extension>> and <<_m_isa_extension>> for specific examples.
 
 
 :sectnums:
@@ -351,15 +379,14 @@ The specific generics are listed below.
 [NOTE]
 The generic type "suv(x:y)" defines a `std_ulogic_vector(x downto y)`.
 
-
 .NEORV32 CPU-Exclusive Generic List
 [cols="<4,^2,<8"]
 [options="header",grid="rows"]
 |=======================
 | Name | Type | Description
 | `CPU_BOOT_ADDR`              | suv(31:0) | CPU reset address. See section <<_address_space>>.
-| `CPU_DEBUG_PARK_ADDR`        | suv(31:0) | "Park loop" entry address for the <<_on_chip_debugger_ocd>>.
-| `CPU_DEBUG_EXC_ADDR`         | suv(31:0) | "Exception" entry address for the <<_on_chip_debugger_ocd>>.
+| `CPU_DEBUG_PARK_ADDR`        | suv(31:0) | "Park loop" entry address for the <<_on_chip_debugger_ocd>>, has to be 4-byte aligned.
+| `CPU_DEBUG_EXC_ADDR`         | suv(31:0) | "Exception" entry address for the <<_on_chip_debugger_ocd>>, has to be 4-byte aligned.
 | `CPU_EXTENSION_RISCV_Sdext`  | boolean   | Implement RISC-V-compatible "debug" CPU operation mode required for the <<_on_chip_debugger_ocd>>.
 | `CPU_EXTENSION_RISCV_Sdtrig` | boolean   | Implement RISC-V-compatible trigger module. See section <<_on_chip_debugger_ocd>>.
 |=======================
@@ -372,6 +399,32 @@ The generic type "suv(x:y)" defines a `std_ulogic_vector(x downto y)`.
 
 The NEORV32 CPU provides several optional RISC-V and custom ISA extensions. The extensions can be enabled/configured
 via the according <<_processor_top_entity_generics>>. This chapter gives a brief overview of the different ISA extensions.
+
+.NEORV32 Instruction Set Extensions
+[cols="<2,<6,<2"]
+[options="header",grid="rows"]
+|=======================
+| Name | Description | Note
+| <<_a_isa_extension,`A`>> | Atomic memory access instructions |
+| <<_b_isa_extension,`B`>> | Bit-manipulation instructions |
+| <<_c_isa_extension,`C`>> | Compressed (16-bit) instructions |
+| <<_e_isa_extension,`E`>> | Embedded CPU extension (reduced register file size) |
+| <<_i_isa_extension,`I`>> | Integer instructions | Base ISA
+| <<_m_isa_extension,`M`>> | Integer multiplication and division instructions |
+| <<_u_isa_extension,`U`>> | Less-privileged _user_ mode extension |
+| <<_x_isa_extension,`X`>> | Platform-specific / NEORV32-specific extension | **Always enabled**
+| <<_zifencei_isa_extension,`Zifencei`>> | Instruction stream synchronization instruction | **Always enabled**
+| <<_zfinx_isa_extension,`Zfinx`>> | Floating-point instructions using integer registers | `F` alternative
+| <<_zicntr_isa_extension,`Zicntr`>> | Base counters extension |
+| <<_zicsr_isa_extension,`Zicsr`>> | Control and status register access instructions | **Always enabled**
+| <<_zihpm_isa_extension,`Zihpm`>> | Hardware performance monitors extension |
+| <<_zmmul_isa_extension,`Zmmul`>> | Integer multiplication-only instruction | `M` alternative)
+| <<_zcfu_isa_extension,`Zcfu`>> | Custom / user-defined instructions |
+| <<_pmp_isa_extension,`PMP`>> | Physical memory protection extension |
+| <<_smcntrpmf_isa_extension,`Smcntrpmf`>> | Counter privilege mode filtering extension |
+| <<_sdext_isa_extension,`Sdext`>> | External debug support extension | For on-chip debugger
+| <<_sdtrig_isa_extension,`Sdtrig`>> | Trigger module extension | For on-chip debugger
+|=======================
 
 .RISC-V ISA Specifications
 [TIP]
@@ -439,47 +492,6 @@ Atomic operations **always bypass** the cache using direct/uncached accesses. Ca
 to maintain data cache coherency (e.g. by using the `fence` instruction).
 
 
-
-==== `I` ISA Extension
-
-The `I` ISA extensions is the base RISC-V integer ISA that is always enabled.
-
-.Instructions and Timing
-[cols="<2,<4,<3"]
-[options="header", grid="rows"]
-|=======================
-| Class | Instructions | Execution cycles
-| ALU           | `add[i]` `slt[i]` `slt[i]u` `xor[i]` `or[i]` `and[i]` `sub` `lui` `auipc` | 2
-| ALU shifts    | `sll[i]` `srl[i]` `sra[i]`                                                | 3 + 1..32; FAST_SHIFT: 4
-| Branches      | `beq` `bne` `blt` `bge` `bltu` `bgeu`                                     | taken: 6; not taken: 3
-| Jump/call     | `jal[r]`                                                                  | 6
-| Load/store    | `lb` `lh` `lw` `lbu` `lhu` `sb` `sh` `sw`                                 | 5
-| System        | `ecall` `ebreak`                                                          | 3
-| Data fence    | `fence`                                                                   | 3
-| System        | `wfi`                                                                     | 3
-| System        | `mret`                                                                    | 5
-| Illegal inst. | -                                                                         | 3
-|=======================
-
-.`fence` Instruction - Predecessor and Successor Bits
-[NOTE]
-The `fence` instruction word's _predecessor_ and _successor_ bits (used for memory ordering) are not evaluated
-by the hardware at all.
-
-.`fence` Instruction - How it works
-[NOTE]
-CPU-internally, the `fence` instruction does not perform any operation inside the CPU. It only sets the
-top's `d_bus_fence_o` signal high for one cycle to inform the memory system a `fence` instruction has been
-executed. Any flags within the `fence` instruction word are ignore by the hardware. However, the `d_bus_fence_o`
-signal is connected to the <<_processor_internal_data_cache_dcache>>. Hence, executing the `fence` instruction
-will clear/flush the data cache and resynchronize it with main memory.
-
-.`wfi` Instruction
-[NOTE]
-The `wfi` instruction is used to enter <<_sleep_mode>>. Executing the `wfi` instruction in user-mode
-will raise an illegal instruction exception if the `TW` bit of <<_mstatus>> is set.
-
-
 ==== `B` ISA Extension
 
 The `B` ISA extension adds instructions for bit-manipulation operations. The NEORV32 `B` ISA extension includes
@@ -503,6 +515,11 @@ the following sub-extensions:
 | Single-bit          | `sbset[i]` `sbclr[i]` `sbinv[i]` `sbext[i]`                                                       | 4
 | Carry-less multiply | `clmul` `clmulh` `clmulr`                                                                         | 36
 |=======================
+
+.Barrel Shifter
+[TIP]
+Shift operations can be accelerated (at the cost of additional logic resources) by enabling the `FAST_SHIFT_EN`
+configuration option that will replace the (time-variant) bit-serial shifter by a (time-constant) barrel shifter.
 
 
 ==== `C` ISA Extension
@@ -532,6 +549,51 @@ shrink hardware size. It provides the same instructions as the the base `I` ISA 
 Due to the reduced register file size an alternate toolchain ABI (`ilp32e*`) is required.
 
 
+==== `I` ISA Extension
+
+The `I` ISA extensions is the base RISC-V integer ISA that is always enabled.
+
+.Instructions and Timing
+[cols="<2,<4,<3"]
+[options="header", grid="rows"]
+|=======================
+| Class | Instructions | Execution cycles
+| ALU           | `add[i]` `slt[i]` `slt[i]u` `xor[i]` `or[i]` `and[i]` `sub` `lui` `auipc` | 2
+| ALU shifts    | `sll[i]` `srl[i]` `sra[i]`                                                | 3 + 1..32; FAST_SHIFT: 4
+| Branches      | `beq` `bne` `blt` `bge` `bltu` `bgeu`                                     | taken: 6; not taken: 3
+| Jump/call     | `jal[r]`                                                                  | 6
+| Load/store    | `lb` `lh` `lw` `lbu` `lhu` `sb` `sh` `sw`                                 | 5
+| System        | `ecall` `ebreak`                                                          | 3
+| Data fence    | `fence`                                                                   | 5
+| System        | `wfi`                                                                     | 3
+| System        | `mret`                                                                    | 5
+| Illegal inst. | -                                                                         | 3
+|=======================
+
+.`fence` Instruction - Predecessor and Successor Bits
+[NOTE]
+The `fence` instruction word's _predecessor_ and _successor_ bits (used for memory ordering) are not evaluated
+by the hardware at all.
+
+.`fence` Instruction - How it works
+[NOTE]
+CPU-internally, the `fence` instruction does not perform any operation inside the CPU. It only sets the
+top's `d_bus_fence_o` signal high for one cycle to inform the memory system a `fence` instruction has been
+executed. Any flags within the `fence` instruction word are ignore by the hardware. However, the `d_bus_fence_o`
+signal is connected to the <<_processor_internal_data_cache_dcache>>. Hence, executing the `fence` instruction
+will clear/flush the data cache and resynchronize it with main memory.
+
+.`wfi` Instruction
+[NOTE]
+The `wfi` instruction is used to enter <<_sleep_mode>>. Executing the `wfi` instruction in user-mode
+will raise an illegal instruction exception if the `TW` bit of <<_mstatus>> is set.
+
+.Barrel Shifter
+[TIP]
+Shift operations can be accelerated (at the cost of additional logic resources) by enabling the `FAST_SHIFT_EN`
+configuration option that will replace the (time-variant) bit-serial shifter by a (time-constant) barrel shifter.
+
+
 ==== `M` ISA Extension
 
 Hardware-accelerated integer multiplication and division operations are available via the RISC-V `M` ISA extension.
@@ -544,6 +606,11 @@ Hardware-accelerated integer multiplication and division operations are availabl
 | Multiplication | `mul` `mulh` `mulhsu` `mulhu` | 36; FAST_MUL: 4
 | Division       | `div` `divu` `rem` `remu`     | 36
 |=======================
+
+.DSP Blocks
+[TIP]
+Multiplication operations can be accelerated (at the cost of additional logic resources) by enabling the `FAST_MUL_EN`
+configuration option that will replace the (time-variant) bit-serial multiplier by (time-constant) FPGA DSP blocks.
 
 
 ==== `U` ISA Extension
@@ -566,7 +633,8 @@ RISC-V specs. Also, custom trap codes for <<_mcause>> are implemented.
 
 ==== `Zifencei` ISA Extension
 
-The `Zifencei` CPU extension allows manual synchronization of the instruction stream.
+The `Zifencei` CPU extension allows manual synchronization of the instruction stream. This extension is always enabled.
+
 The `fence.i` instruction resets the CPU's front-end (instruction fetch) and flushes the prefetch buffer.
 This allows a clean re-fetch of modified instructions from memory. Also, the top's `i_bus_fencei_o` signal is set
 high for one cycle to inform the memory system (like the <<_processor_internal_instruction_cache_icache>> to perform a flush/reload.
@@ -590,21 +658,16 @@ less hardware resources and features faster context changes. This also implies t
 register file-related load/store or move instructions. The `Zfinx` extension'S floating-point unit is controlled
 via dedicated <<_floating_point_csrs>>.
 
+.Fused Multiply-Add and Division Instructions
 [WARNING]
 Fused multiply-add instructions `f[n]m[add/sub].s` are not supported!
 Division `fdiv.s` and square root `fsqrt.s` instructions are not supported yet!
 
+.Subnormal Number
 [WARNING]
-Subnormal numbers ("de-normalized" numbers) are not supported by the NEORV32 FPU.
-Subnormal numbers (exponent = 0) are _flushed to zero_ setting them to +/- 0 before entering the
-FPU's processing core. If a computational instruction (like `fmul.s`) generates a subnormal result, the
-result is also flushed to zero during normalization.
-
-[WARNING]
-The `Zfinx` extension is not yet officially ratified, but is expected to stay unchanged. There is no
-software support for the `Zfinx` extension in the upstream GCC RISC-V port yet. However, an
-intrinsic library is provided to utilize the provided `Zfinx` floating-point extension from C-language
-code (see `sw/example/floating_point_test`).
+Subnormal numbers ("de-normalized" numbers, i.e. exponent = 0) are not supported by the NEORV32 FPU.
+Subnormal numbers are _flushed to zero_ setting them to +/- 0 before being processed by **any** FPU operation.
+If a computational instruction generates a subnormal result it is also flushed to zero during normalization.
 
 .Instructions and Timing
 [cols="<2,<4,<3"]
@@ -826,10 +889,10 @@ defined by the NEORV32 core library (the runtime environment _RTE_) and can be u
 with the pre-defined RTE function. The <<_mcause>>, <<_mepc>>, <<_mtval>> and <<_mtinst>> columns show the value being
 written to the according CSRs when a trap is triggered:
 
-* **I-PC** - address of interrupted instruction (instruction has _not_ been executed yet)
+* **I-PC** - address of intercepted instruction (instruction has _not_ been executed yet)
 * **PC** - address of instruction that caused the trap (instruction has been executed)
 * **ADR** - bad data memory access address that caused the trap
-* **INS** - the (decompressed) instruction word that caused the trap
+* **INS** - the transformed/decompressed instruction word that caused the trap
 * **0** - zero
 
 .NEORV32 Trap Listing
@@ -838,8 +901,8 @@ written to the according CSRs when a trap is triggered:
 |=======================
 | Prio. | `mcause`     | RTE Trap ID              | Cause                                | `mepc` | `mtval` | `mtinst`
 7+^| **Exceptions** (_synchronous_ to instruction execution)                                                 
-| 1     | `0x00000000` | `TRAP_CODE_I_MISALIGNED` | instruction fetch address misaligned | I-PC   | 0       | INS
-| 2     | `0x00000001` | `TRAP_CODE_I_ACCESS`     | instruction fetch bus access fault   | I-PC   | 0       | INS
+| 1     | `0x00000000` | `TRAP_CODE_I_MISALIGNED` | instruction address misaligned       | PC     | 0       | INS
+| 2     | `0x00000001` | `TRAP_CODE_I_ACCESS`     | instruction bus access fault         | I-PC   | 0       | INS
 | 3     | `0x00000002` | `TRAP_CODE_I_ILLEGAL`    | illegal instruction                  | PC     | 0       | INS
 | 4     | `0x0000000b` | `TRAP_CODE_MENV_CALL`    | environment call from M-mode         | PC     | 0       | INS
 | 5     | `0x00000008` | `TRAP_CODE_UENV_CALL`    | environment call from U-mode         | PC     | 0       | INS

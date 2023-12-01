@@ -44,9 +44,6 @@ package neorv32_package is
 
   -- Architecture Configuration -------------------------------------------------------------
   -- -------------------------------------------------------------------------------------------
-  -- if register x0 is implemented as a *physical register* it has to be explicitly set to zero by the CPU hardware --
-  constant reset_x0_c : boolean := true; -- has to be 'true' for the default register file rtl description (BRAM-based)
-
   -- max response time for processor-internal bus transactions --
   -- = cycles after which an *unacknowledged* internal bus access will timeout triggering a bus fault exception
   constant bus_timeout_c : natural := 15; -- default = 15
@@ -59,7 +56,7 @@ package neorv32_package is
 
   -- Architecture Constants -----------------------------------------------------------------
   -- -------------------------------------------------------------------------------------------
-  constant hw_version_c : std_ulogic_vector(31 downto 0) := x"01080908"; -- hardware version
+  constant hw_version_c : std_ulogic_vector(31 downto 0) := x"01090200"; -- hardware version
   constant archid_c     : natural := 19; -- official RISC-V architecture ID
   constant XLEN         : natural := 32; -- native data path width, do not change!
 
@@ -68,11 +65,9 @@ package neorv32_package is
   constant is_simulation_c : boolean := false -- seems like we're on real hardware
 -- pragma translate_off
 -- synthesis translate_off
--- synthesis synthesis_off
 -- RTL_SYNTHESIS OFF
   or true -- this MIGHT be a simulation
 -- RTL_SYNTHESIS ON
--- synthesis synthesis_on
 -- synthesis translate_on
 -- pragma translate_on
   ;
@@ -91,22 +86,22 @@ package neorv32_package is
   constant mem_io_base_c   : std_ulogic_vector(31 downto 0) := x"ffffe000";
   constant mem_io_size_c   : natural := 8*1024;
 
-  -- Start of uncached memory access (page / 4MSBs only) --
+  -- Start of uncached memory access (256MB page / 4MSBs only) --
   constant uncached_begin_c  : std_ulogic_vector(31 downto 0) := x"f0000000";
 
   -- IO Address Map --
   constant iodev_size_c      : natural := 256; -- size of a single IO device (bytes)
---constant base_???_c        : std_ulogic_vector(31 downto 0) := x"ffffe000"; -- reserved
---constant base_???_c        : std_ulogic_vector(31 downto 0) := x"ffffe100"; -- reserved
---constant base_???_c        : std_ulogic_vector(31 downto 0) := x"ffffe200"; -- reserved
---constant base_???_c        : std_ulogic_vector(31 downto 0) := x"ffffe300"; -- reserved
---constant base_???_c        : std_ulogic_vector(31 downto 0) := x"ffffe400"; -- reserved
---constant base_???_c        : std_ulogic_vector(31 downto 0) := x"ffffe500"; -- reserved
---constant base_???_c        : std_ulogic_vector(31 downto 0) := x"ffffe600"; -- reserved
---constant base_???_c        : std_ulogic_vector(31 downto 0) := x"ffffe700"; -- reserved
---constant base_???_c        : std_ulogic_vector(31 downto 0) := x"ffffe800"; -- reserved
---constant base_???_c        : std_ulogic_vector(31 downto 0) := x"ffffe900"; -- reserved
---constant base_???_c        : std_ulogic_vector(31 downto 0) := x"ffffea00"; -- reserved
+--constant base_io_???_c     : std_ulogic_vector(31 downto 0) := x"ffffe000"; -- reserved
+--constant base_io_???_c     : std_ulogic_vector(31 downto 0) := x"ffffe100"; -- reserved
+--constant base_io_???_c     : std_ulogic_vector(31 downto 0) := x"ffffe200"; -- reserved
+--constant base_io_???_c     : std_ulogic_vector(31 downto 0) := x"ffffe300"; -- reserved
+--constant base_io_???_c     : std_ulogic_vector(31 downto 0) := x"ffffe400"; -- reserved
+--constant base_io_???_c     : std_ulogic_vector(31 downto 0) := x"ffffe500"; -- reserved
+--constant base_io_???_c     : std_ulogic_vector(31 downto 0) := x"ffffe600"; -- reserved
+--constant base_io_???_c     : std_ulogic_vector(31 downto 0) := x"ffffe700"; -- reserved
+--constant base_io_???_c     : std_ulogic_vector(31 downto 0) := x"ffffe800"; -- reserved
+--constant base_io_???_c     : std_ulogic_vector(31 downto 0) := x"ffffe900"; -- reserved
+--constant base_io_???_c     : std_ulogic_vector(31 downto 0) := x"ffffea00"; -- reserved
   constant base_io_cfs_c     : std_ulogic_vector(31 downto 0) := x"ffffeb00";
   constant base_io_slink_c   : std_ulogic_vector(31 downto 0) := x"ffffec00";
   constant base_io_dma_c     : std_ulogic_vector(31 downto 0) := x"ffffed00";
@@ -341,11 +336,11 @@ package neorv32_package is
   constant fp_class_qnan_c       : natural := 9; -- quiet NaN (qNaN)
 
   -- exception flags --
-  constant fp_exc_nv_c : natural := 0; -- invalid operation
-  constant fp_exc_dz_c : natural := 1; -- divide by zero
+  constant fp_exc_nx_c : natural := 0; -- inexact
+  constant fp_exc_uf_c : natural := 1; -- underflow
   constant fp_exc_of_c : natural := 2; -- overflow
-  constant fp_exc_uf_c : natural := 3; -- underflow
-  constant fp_exc_nx_c : natural := 4; -- inexact
+  constant fp_exc_dz_c : natural := 3; -- division by zero
+  constant fp_exc_nv_c : natural := 4; -- invalid operation
 
   -- special values (single-precision) --
   constant fp_single_qnan_c     : std_ulogic_vector(31 downto 0) := x"7fc00000"; -- quiet NaN
@@ -368,6 +363,9 @@ package neorv32_package is
   constant csr_mtvec_c          : std_ulogic_vector(11 downto 0) := x"305";
   constant csr_mcounteren_c     : std_ulogic_vector(11 downto 0) := x"306";
   constant csr_mstatush_c       : std_ulogic_vector(11 downto 0) := x"310";
+  -- machine configuration --
+  constant csr_menvcfg_c        : std_ulogic_vector(11 downto 0) := x"30a";
+  constant csr_menvcfgh_c       : std_ulogic_vector(11 downto 0) := x"31a";
   -- machine counter setup --
   constant csr_mcountinhibit_c  : std_ulogic_vector(11 downto 0) := x"320";
   constant csr_mcyclecfg_c      : std_ulogic_vector(11 downto 0) := x"321";
@@ -421,9 +419,7 @@ package neorv32_package is
   constant csr_tselect_c        : std_ulogic_vector(11 downto 0) := x"7a0";
   constant csr_tdata1_c         : std_ulogic_vector(11 downto 0) := x"7a1";
   constant csr_tdata2_c         : std_ulogic_vector(11 downto 0) := x"7a2";
-  constant csr_tdata3_c         : std_ulogic_vector(11 downto 0) := x"7a3";
   constant csr_tinfo_c          : std_ulogic_vector(11 downto 0) := x"7a4";
-  constant csr_tcontrol_c       : std_ulogic_vector(11 downto 0) := x"7a5";
   -- debug mode registers --
   constant csr_dcsr_c           : std_ulogic_vector(11 downto 0) := x"7b0";
   constant csr_dpc_c            : std_ulogic_vector(11 downto 0) := x"7b1";
@@ -607,7 +603,7 @@ package neorv32_package is
   constant rf_mux_alu_c : std_ulogic_vector(1 downto 0) := "00"; -- register file <= alu result
   constant rf_mux_mem_c : std_ulogic_vector(1 downto 0) := "01"; -- register file <= memory read data
   constant rf_mux_csr_c : std_ulogic_vector(1 downto 0) := "10"; -- register file <= CSR read data
-  constant rf_mux_npc_c : std_ulogic_vector(1 downto 0) := "11"; -- register file <= next-PC (for branch-and-link)
+  constant rf_mux_ret_c : std_ulogic_vector(1 downto 0) := "11"; -- register file <= link-PC (return address)
 
   -- Trap ID Codes --------------------------------------------------------------------------
   -- -------------------------------------------------------------------------------------------
@@ -650,7 +646,7 @@ package neorv32_package is
   constant trap_db_halt_c  : std_ulogic_vector(6 downto 0) := "1" & "1" & "00011"; -- 3: external halt request (async)
   constant trap_db_step_c  : std_ulogic_vector(6 downto 0) := "1" & "1" & "00100"; -- 4: single-stepping (async)
 
-  -- CPU Trap System ------------------------------------------------------------------------
+  -- Trap System ----------------------------------------------------------------------------
   -- -------------------------------------------------------------------------------------------
   -- exception source bits --
   constant exc_iaccess_c  : natural :=  0; -- instruction access fault
@@ -663,8 +659,8 @@ package neorv32_package is
   constant exc_saccess_c  : natural :=  7; -- store access fault
   constant exc_laccess_c  : natural :=  8; -- load access fault
   -- for debug mode only --
-  constant exc_db_break_c : natural :=  9; -- enter debug mode via ebreak instruction ("sync EXCEPTION")
-  constant exc_db_hw_c    : natural := 10; -- enter debug mode via hw trigger ("sync EXCEPTION")
+  constant exc_db_break_c : natural :=  9; -- enter debug mode via ebreak instruction
+  constant exc_db_hw_c    : natural := 10; -- enter debug mode via hw trigger
   --
   constant exc_width_c    : natural := 11; -- length of this list in bits
   -- interrupt source bits --
@@ -688,12 +684,12 @@ package neorv32_package is
   constant irq_firq_14_c  : natural := 17; -- fast interrupt channel 14
   constant irq_firq_15_c  : natural := 18; -- fast interrupt channel 15
   -- for debug mode only --
-  constant irq_db_halt_c  : natural := 19; -- enter debug mode via external halt request ("async IRQ")
-  constant irq_db_step_c  : natural := 20; -- enter debug mode via single-stepping ("async IRQ")
+  constant irq_db_halt_c  : natural := 19; -- enter debug mode via external halt request
+  constant irq_db_step_c  : natural := 20; -- enter debug mode via single-stepping
   --
   constant irq_width_c    : natural := 21; -- length of this list in bits
 
-  -- CPU Privilege Modes --------------------------------------------------------------------
+  -- Privilege Modes ------------------------------------------------------------------------
   -- -------------------------------------------------------------------------------------------
   constant priv_mode_m_c : std_ulogic := '1'; -- machine mode
   constant priv_mode_u_c : std_ulogic := '0'; -- user mode
@@ -758,37 +754,37 @@ package neorv32_package is
   component neorv32_top
     generic (
       -- General --
-      CLOCK_FREQUENCY              : natural;
-      HART_ID                      : std_ulogic_vector(31 downto 0) := x"00000000";
-      VENDOR_ID                    : std_ulogic_vector(31 downto 0) := x"00000000";
-      INT_BOOTLOADER_EN            : boolean := false;
+      CLOCK_FREQUENCY            : natural;
+      HART_ID                    : std_ulogic_vector(31 downto 0) := x"00000000";
+      VENDOR_ID                  : std_ulogic_vector(31 downto 0) := x"00000000";
+      INT_BOOTLOADER_EN          : boolean := false;
       -- On-Chip Debugger (OCD) --
-      ON_CHIP_DEBUGGER_EN          : boolean := false;
-      DM_LEGACY_MODE               : boolean := false;
+      ON_CHIP_DEBUGGER_EN        : boolean := false;
+      DM_LEGACY_MODE             : boolean := false;
       -- RISC-V CPU Extensions --
-      CPU_EXTENSION_RISCV_A        : boolean := false;
-      CPU_EXTENSION_RISCV_B        : boolean := false;
-      CPU_EXTENSION_RISCV_C        : boolean := false;
-      CPU_EXTENSION_RISCV_E        : boolean := false;
-      CPU_EXTENSION_RISCV_M        : boolean := false;
-      CPU_EXTENSION_RISCV_U        : boolean := false;
-      CPU_EXTENSION_RISCV_Zfinx    : boolean := false;
-      CPU_EXTENSION_RISCV_Zicntr   : boolean := true;
-      CPU_EXTENSION_RISCV_Zihpm    : boolean := false;
-      CPU_EXTENSION_RISCV_Zifencei : boolean := false;
-      CPU_EXTENSION_RISCV_Zmmul    : boolean := false;
-      CPU_EXTENSION_RISCV_Zxcfu    : boolean := false;
+      CPU_EXTENSION_RISCV_A      : boolean := false;
+      CPU_EXTENSION_RISCV_B      : boolean := false;
+      CPU_EXTENSION_RISCV_C      : boolean := false;
+      CPU_EXTENSION_RISCV_E      : boolean := false;
+      CPU_EXTENSION_RISCV_M      : boolean := false;
+      CPU_EXTENSION_RISCV_U      : boolean := false;
+      CPU_EXTENSION_RISCV_Zfinx  : boolean := false;
+      CPU_EXTENSION_RISCV_Zicntr : boolean := true;
+      CPU_EXTENSION_RISCV_Zihpm  : boolean := false;
+      CPU_EXTENSION_RISCV_Zmmul  : boolean := false;
+      CPU_EXTENSION_RISCV_Zxcfu  : boolean := false;
       -- Tuning Options --
-      FAST_MUL_EN                  : boolean := false;
-      FAST_SHIFT_EN                : boolean := false;
+      FAST_MUL_EN                : boolean := false;
+      FAST_SHIFT_EN              : boolean := false;
+      REGFILE_HW_RST             : boolean := false;
       -- Physical Memory Protection (PMP) --
-      PMP_NUM_REGIONS              : natural range 0 to 16 := 0;
-      PMP_MIN_GRANULARITY          : natural := 4;
+      PMP_NUM_REGIONS            : natural range 0 to 16 := 0;
+      PMP_MIN_GRANULARITY        : natural := 4;
       -- Hardware Performance Monitors (HPM) --
-      HPM_NUM_CNTS                 : natural range 0 to 13 := 0;
-      HPM_CNT_WIDTH                : natural range 0 to 64 := 40;
+      HPM_NUM_CNTS               : natural range 0 to 13 := 0;
+      HPM_CNT_WIDTH              : natural range 0 to 64 := 40;
       -- Atomic Memory Access - Reservation Set Granularity --
-      AMO_RVS_GRANULARITY          : natural := 4;
+      AMO_RVS_GRANULARITY        : natural := 4;
       -- Internal Instruction memory (IMEM) --
       MEM_INT_IMEM_EN              : boolean := false;
       MEM_INT_IMEM_SIZE            : natural := 16*1024;
@@ -797,60 +793,60 @@ package neorv32_package is
       MEM_INT_IMEM_SEC             : integer := 1;
       MEM_INT_IV_EN                : boolean := false;
       -- Internal Data memory (DMEM) --
-      MEM_INT_DMEM_EN              : boolean := false;
-      MEM_INT_DMEM_SIZE            : natural := 8*1024;
+      MEM_INT_DMEM_EN            : boolean := false;
+      MEM_INT_DMEM_SIZE          : natural := 8*1024;
       -- Internal Instruction Cache (iCACHE) --
-      ICACHE_EN                    : boolean                  := false;
-      ICACHE_NUM_BLOCKS            : natural range 1 to 256   := 4;
-      ICACHE_BLOCK_SIZE            : natural range 4 to 2**16 := 64;
-      ICACHE_ASSOCIATIVITY         : natural range 1 to 2     := 1;
+      ICACHE_EN                  : boolean                  := false;
+      ICACHE_NUM_BLOCKS          : natural range 1 to 256   := 4;
+      ICACHE_BLOCK_SIZE          : natural range 4 to 2**16 := 64;
+      ICACHE_ASSOCIATIVITY       : natural range 1 to 2     := 1;
       -- Internal Data Cache (dCACHE) --
-      DCACHE_EN                    : boolean                  := false;
-      DCACHE_NUM_BLOCKS            : natural range 1 to 256   := 4;
-      DCACHE_BLOCK_SIZE            : natural range 4 to 2**16 := 64;
+      DCACHE_EN                  : boolean                  := false;
+      DCACHE_NUM_BLOCKS          : natural range 1 to 256   := 4;
+      DCACHE_BLOCK_SIZE          : natural range 4 to 2**16 := 64;
       -- External memory interface (WISHBONE) --
-      MEM_EXT_EN                   : boolean := false;
-      MEM_EXT_TIMEOUT              : natural := 255;
-      MEM_EXT_PIPE_MODE            : boolean := false;
-      MEM_EXT_BIG_ENDIAN           : boolean := false;
-      MEM_EXT_ASYNC_RX             : boolean := false;
-      MEM_EXT_ASYNC_TX             : boolean := false;
+      MEM_EXT_EN                 : boolean := false;
+      MEM_EXT_TIMEOUT            : natural := 255;
+      MEM_EXT_PIPE_MODE          : boolean := false;
+      MEM_EXT_BIG_ENDIAN         : boolean := false;
+      MEM_EXT_ASYNC_RX           : boolean := false;
+      MEM_EXT_ASYNC_TX           : boolean := false;
       -- External Interrupts Controller (XIRQ) --
-      XIRQ_NUM_CH                  : natural range 0 to 32          := 0;
-      XIRQ_TRIGGER_TYPE            : std_ulogic_vector(31 downto 0) := x"ffffffff";
-      XIRQ_TRIGGER_POLARITY        : std_ulogic_vector(31 downto 0) := x"ffffffff";
+      XIRQ_NUM_CH                : natural range 0 to 32          := 0;
+      XIRQ_TRIGGER_TYPE          : std_ulogic_vector(31 downto 0) := x"ffffffff";
+      XIRQ_TRIGGER_POLARITY      : std_ulogic_vector(31 downto 0) := x"ffffffff";
       -- Processor peripherals --
-      IO_GPIO_NUM                  : natural range 0 to 64          := 0;
-      IO_MTIME_EN                  : boolean                        := false;
-      IO_UART0_EN                  : boolean                        := false;
-      IO_UART0_RX_FIFO             : natural range 1 to 2**15       := 1;
-      IO_UART0_TX_FIFO             : natural range 1 to 2**15       := 1;
-      IO_UART1_EN                  : boolean                        := false;
-      IO_UART1_RX_FIFO             : natural range 1 to 2**15       := 1;
-      IO_UART1_TX_FIFO             : natural range 1 to 2**15       := 1;
-      IO_SPI_EN                    : boolean                        := false;
-      IO_SPI_FIFO                  : natural range 1 to 2**15       := 1;
-      IO_SDI_EN                    : boolean                        := false;
-      IO_SDI_FIFO                  : natural range 1 to 2**15       := 1;
-      IO_TWI_EN                    : boolean                        := false;
-      IO_PWM_NUM_CH                : natural range 0 to 12          := 0;
-      IO_WDT_EN                    : boolean                        := false;
-      IO_TRNG_EN                   : boolean                        := false;
-      IO_TRNG_FIFO                 : natural range 1 to 2**15       := 1;
-      IO_CFS_EN                    : boolean                        := false;
-      IO_CFS_CONFIG                : std_ulogic_vector(31 downto 0) := x"00000000";
-      IO_CFS_IN_SIZE               : natural                        := 32;
-      IO_CFS_OUT_SIZE              : natural                        := 32;
-      IO_NEOLED_EN                 : boolean                        := false;
-      IO_NEOLED_TX_FIFO            : natural range 1 to 2**15       := 1;
-      IO_GPTMR_EN                  : boolean                        := false;
-      IO_XIP_EN                    : boolean                        := false;
-      IO_ONEWIRE_EN                : boolean                        := false;
-      IO_DMA_EN                    : boolean                        := false;
-      IO_SLINK_EN                  : boolean                        := false;
-      IO_SLINK_RX_FIFO             : natural range 1 to 2**15       := 1;
-      IO_SLINK_TX_FIFO             : natural range 1 to 2**15       := 1;
-      IO_CRC_EN                    : boolean                        := false
+      IO_GPIO_NUM                : natural range 0 to 64          := 0;
+      IO_MTIME_EN                : boolean                        := false;
+      IO_UART0_EN                : boolean                        := false;
+      IO_UART0_RX_FIFO           : natural range 1 to 2**15       := 1;
+      IO_UART0_TX_FIFO           : natural range 1 to 2**15       := 1;
+      IO_UART1_EN                : boolean                        := false;
+      IO_UART1_RX_FIFO           : natural range 1 to 2**15       := 1;
+      IO_UART1_TX_FIFO           : natural range 1 to 2**15       := 1;
+      IO_SPI_EN                  : boolean                        := false;
+      IO_SPI_FIFO                : natural range 1 to 2**15       := 1;
+      IO_SDI_EN                  : boolean                        := false;
+      IO_SDI_FIFO                : natural range 1 to 2**15       := 1;
+      IO_TWI_EN                  : boolean                        := false;
+      IO_PWM_NUM_CH              : natural range 0 to 12          := 0;
+      IO_WDT_EN                  : boolean                        := false;
+      IO_TRNG_EN                 : boolean                        := false;
+      IO_TRNG_FIFO               : natural range 1 to 2**15       := 1;
+      IO_CFS_EN                  : boolean                        := false;
+      IO_CFS_CONFIG              : std_ulogic_vector(31 downto 0) := x"00000000";
+      IO_CFS_IN_SIZE             : natural                        := 32;
+      IO_CFS_OUT_SIZE            : natural                        := 32;
+      IO_NEOLED_EN               : boolean                        := false;
+      IO_NEOLED_TX_FIFO          : natural range 1 to 2**15       := 1;
+      IO_GPTMR_EN                : boolean                        := false;
+      IO_XIP_EN                  : boolean                        := false;
+      IO_ONEWIRE_EN              : boolean                        := false;
+      IO_DMA_EN                  : boolean                        := false;
+      IO_SLINK_EN                : boolean                        := false;
+      IO_SLINK_RX_FIFO           : natural range 1 to 2**15       := 1;
+      IO_SLINK_TX_FIFO           : natural range 1 to 2**15       := 1;
+      IO_CRC_EN                  : boolean                        := false
     );
     port (
       -- Global control --

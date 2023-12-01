@@ -12,7 +12,7 @@ bootloader ROM) and the processor has to be re-synthesized.
 
 [NOTE]
 Keep in mind that the maximum size for the bootloader is limited to 8kB and it should be compiled using the
-minimal base & privileged ISA `rv32i_zicsr` only to ensure it can work independently of the actual CPU configuration.
+minimal base & privileged ISA `rv32i_zicsr_zifencei` only to ensure it can work independently of the actual CPU configuration.
 
 .Bootloader configuration parameters
 [cols="<2,^1,^2,<6"]
@@ -20,7 +20,7 @@ minimal base & privileged ISA `rv32i_zicsr` only to ensure it can work independe
 |=======================
 | Parameter | Default | Legal values | Description
 4+^| Memory layout
-| `EXE_BASE_ADDR` | `0x00000000` | _any_ | Base address / boot address for the executable (see section <<_address_space>>)
+| `EXE_BASE_ADDR` | `0x00000000` | _any_ | Base address / boot address for the executable (see section "Address Space" in the NEORV32 data sheet)
 4+^| Serial console interface
 | `UART_EN`   | `1` | `0`, `1` | Set to `0` to disable UART0 (no serial console at all)
 | `UART_BAUD` | `19200` | _any_ | Baud rate of UART0

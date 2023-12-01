@@ -72,6 +72,7 @@ enum NEORV32_SPI_CTRL_enum {
   SPI_CTRL_CDIV1        = 11, /**< SPI control register(11) (r/w): Clock divider bit 1 */
   SPI_CTRL_CDIV2        = 12, /**< SPI control register(12) (r/w): Clock divider bit 2 */
   SPI_CTRL_CDIV3        = 13, /**< SPI control register(13) (r/w): Clock divider bit 3 */
+  SPI_CTRL_HIGHSPEED    = 14, /**< SPI control register(14) (r/w): High-speed mode */
 
   SPI_CTRL_RX_AVAIL     = 16, /**< SPI control register(16) (r/-): RX FIFO data available (RX FIFO not empty) */
   SPI_CTRL_TX_EMPTY     = 17, /**< SPI control register(17) (r/-): TX FIFO empty */
@@ -94,17 +95,20 @@ enum NEORV32_SPI_CTRL_enum {
  * @name Prototypes
  **************************************************************************/
 /**@{*/
-int     neorv32_spi_available(void);
-void    neorv32_spi_setup(int prsc, int cdiv, int clk_phase, int clk_polarity, uint32_t irq_mask);
-void    neorv32_spi_disable(void);
-void    neorv32_spi_enable(void);
-int     neorv32_spi_get_fifo_depth(void);
-void    neorv32_spi_cs_en(int cs);
-void    neorv32_spi_cs_dis(void);
-uint8_t neorv32_spi_trans(uint8_t tx_data);
-void    neorv32_spi_put_nonblocking(uint8_t tx_data);
-uint8_t neorv32_spi_get_nonblocking(void);
-int     neorv32_spi_busy(void);
+int      neorv32_spi_available(void);
+void     neorv32_spi_setup(int prsc, int cdiv, int clk_phase, int clk_polarity, uint32_t irq_mask);
+void     neorv32_spi_highspeed_enable(void);
+void     neorv32_spi_highspeed_disable(void);
+uint32_t neorv32_spi_get_clock_speed(void);
+void     neorv32_spi_disable(void);
+void     neorv32_spi_enable(void);
+int      neorv32_spi_get_fifo_depth(void);
+void     neorv32_spi_cs_en(int cs);
+void     neorv32_spi_cs_dis(void);
+uint8_t  neorv32_spi_trans(uint8_t tx_data);
+void     neorv32_spi_put_nonblocking(uint8_t tx_data);
+uint8_t  neorv32_spi_get_nonblocking(void);
+int      neorv32_spi_busy(void);
 /**@}*/
 
 #endif // neorv32_spi_h

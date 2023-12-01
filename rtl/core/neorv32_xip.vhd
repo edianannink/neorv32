@@ -81,11 +81,15 @@ architecture neorv32_xip_rtl of neorv32_xip is
   constant ctrl_spi_csen_c    : natural := 21; -- r/w: SPI chip-select enabled
   constant ctrl_highspeed_c   : natural := 22; -- r/w: SPI high-speed mode enable (ignoring ctrl_spi_prsc)
   constant ctrl_burst_en_c    : natural := 23; -- r/w: XIP burst mode enable
+  constant ctrl_cdiv0_c       : natural := 24; -- r/w: clock divider bit 0
+  constant ctrl_cdiv1_c       : natural := 25; -- r/w: clock divider bit 1
+  constant ctrl_cdiv2_c       : natural := 26; -- r/w: clock divider bit 2
+  constant ctrl_cdiv3_c       : natural := 27; -- r/w: clock divider bit 3
   --
   constant ctrl_phy_busy_c    : natural := 30; -- r/-: SPI PHY is busy when set
   constant ctrl_xip_busy_c    : natural := 31; -- r/-: XIP access in progress
   --
-  signal ctrl : std_ulogic_vector(23 downto 0);
+  signal ctrl : std_ulogic_vector(27 downto 0);
 
   -- Direct SPI access registers --
   signal spi_data_lo : std_ulogic_vector(31 downto 0);
@@ -104,17 +108,19 @@ architecture neorv32_xip_rtl of neorv32_xip is
     addr_lookahead : std_ulogic_vector(31 downto 0);
     xip_acc_err    : std_ulogic;
     busy           : std_ulogic;
-    tmo_cnt        : std_ulogic_vector(04 downto 0); -- timeout counter for auto CS de-assert (burst mode only)
+    tmo_cnt        : std_ulogic_vector(4 downto 0); -- timeout counter for auto CS de-assert (burst mode only)
   end record;
   signal arbiter : arbiter_t;
 
-  -- SPI clock --
+  -- Clock generator --
+  signal cdiv_cnt   : std_ulogic_vector(3 downto 0);
   signal spi_clk_en : std_ulogic;
 
   -- Component: SPI PHY --
   component neorv32_xip_phy
   port (
     -- global control --
+    rstn_i       : in  std_ulogic; -- reset, async, low-active
     clk_i        : in  std_ulogic; -- clock
     spi_clk_en_i : in  std_ulogic; -- pre-scaled SPI clock-enable
     -- operation configuration --
@@ -126,7 +132,7 @@ architecture neorv32_xip_rtl of neorv32_xip is
     op_final_i   : in  std_ulogic; -- end current transmission
     op_csen_i    : in  std_ulogic; -- actually enabled device for transmission
     op_busy_o    : out std_ulogic; -- transmission in progress when set
-    op_nbytes_i  : in  std_ulogic_vector(03 downto 0); -- actual number of bytes to transmit (1..9)
+    op_nbytes_i  : in  std_ulogic_vector(3 downto 0); -- actual number of bytes to transmit (1..9)
     op_wdata_i   : in  std_ulogic_vector(71 downto 0); -- write data
     op_rdata_o   : out std_ulogic_vector(31 downto 0); -- read data
     -- SPI interface --
@@ -149,81 +155,85 @@ architecture neorv32_xip_rtl of neorv32_xip is
 
 begin
 
-  -- Control Write Access -------------------------------------------------------------------
+  -- Control Bus Access ---------------------------------------------------------------------
   -- -------------------------------------------------------------------------------------------
-  ctrl_write_access : process(rstn_i, clk_i)
+  ctrl_bus_access : process(rstn_i, clk_i)
   begin
     if (rstn_i = '0') then
-      ctrl        <= (others => '0');
-      spi_data_lo <= (others => '0');
-      spi_data_hi <= (others => '0');
-      spi_trigger <= '0';
-    elsif rising_edge(clk_i) then
-      spi_trigger <= '0';
-      if (bus_req_i.stb = '1') and (bus_req_i.rw = '1') then
-        -- control register --
-        if (bus_req_i.addr(3 downto 2) = "00") then
-          ctrl(ctrl_enable_c)                                <= bus_req_i.data(ctrl_enable_c);
-          ctrl(ctrl_spi_prsc2_c downto ctrl_spi_prsc0_c)     <= bus_req_i.data(ctrl_spi_prsc2_c downto ctrl_spi_prsc0_c);
-          ctrl(ctrl_spi_cpol_c)                              <= bus_req_i.data(ctrl_spi_cpol_c);
-          ctrl(ctrl_spi_cpha_c)                              <= bus_req_i.data(ctrl_spi_cpha_c);
-          ctrl(ctrl_spi_nbytes3_c downto ctrl_spi_nbytes0_c) <= bus_req_i.data(ctrl_spi_nbytes3_c downto ctrl_spi_nbytes0_c);
-          ctrl(ctrl_xip_enable_c)                            <= bus_req_i.data(ctrl_xip_enable_c);
-          ctrl(ctrl_xip_abytes1_c downto ctrl_xip_abytes0_c) <= bus_req_i.data(ctrl_xip_abytes1_c downto ctrl_xip_abytes0_c);
-          ctrl(ctrl_rd_cmd7_c downto ctrl_rd_cmd0_c)         <= bus_req_i.data(ctrl_rd_cmd7_c downto ctrl_rd_cmd0_c);
-          ctrl(ctrl_spi_csen_c)                              <= bus_req_i.data(ctrl_spi_csen_c);
-          ctrl(ctrl_highspeed_c)                             <= bus_req_i.data(ctrl_highspeed_c);
-          ctrl(ctrl_burst_en_c)                              <= bus_req_i.data(ctrl_burst_en_c);
-        end if;
-        -- SPI direct data access register lo --
-        if (bus_req_i.addr(3 downto 2) = "10") then
-          spi_data_lo <= bus_req_i.data;
-        end if;
-        -- SPI direct data access register hi --
-        if (bus_req_i.addr(3 downto 2) = "11") then
-          spi_data_hi <= bus_req_i.data;
-          spi_trigger <= '1'; -- trigger direct SPI transaction
-        end if;
-      end if;
-    end if;
-  end process ctrl_write_access;
-
-
-  -- Control Read Access --------------------------------------------------------------------
-  -- -------------------------------------------------------------------------------------------
-  ctrl_read_access : process(clk_i)
-  begin
-    if rising_edge(clk_i) then
-      bus_rsp_o.ack  <= bus_req_i.stb; -- access acknowledge
+      bus_rsp_o.ack  <= '0';
+      bus_rsp_o.err  <= '0';
       bus_rsp_o.data <= (others => '0');
-      if (bus_req_i.stb = '1') and (bus_req_i.rw = '0') then
-        case bus_req_i.addr(3 downto 2) is
-          when "00" => -- 'xip_ctrl_addr_c' - control register
-            bus_rsp_o.data(ctrl_enable_c)                                <= ctrl(ctrl_enable_c);
-            bus_rsp_o.data(ctrl_spi_prsc2_c downto ctrl_spi_prsc0_c)     <= ctrl(ctrl_spi_prsc2_c downto ctrl_spi_prsc0_c);
-            bus_rsp_o.data(ctrl_spi_cpol_c)                              <= ctrl(ctrl_spi_cpol_c);
-            bus_rsp_o.data(ctrl_spi_cpha_c)                              <= ctrl(ctrl_spi_cpha_c);
-            bus_rsp_o.data(ctrl_spi_nbytes3_c downto ctrl_spi_nbytes0_c) <= ctrl(ctrl_spi_nbytes3_c downto ctrl_spi_nbytes0_c);
-            bus_rsp_o.data(ctrl_xip_enable_c)                            <= ctrl(ctrl_xip_enable_c);
-            bus_rsp_o.data(ctrl_xip_abytes1_c downto ctrl_xip_abytes0_c) <= ctrl(ctrl_xip_abytes1_c downto ctrl_xip_abytes0_c);
-            bus_rsp_o.data(ctrl_rd_cmd7_c downto ctrl_rd_cmd0_c)         <= ctrl(ctrl_rd_cmd7_c downto ctrl_rd_cmd0_c);
-            bus_rsp_o.data(ctrl_spi_csen_c)                              <= ctrl(ctrl_spi_csen_c);
-            bus_rsp_o.data(ctrl_highspeed_c)                             <= ctrl(ctrl_highspeed_c);
-            bus_rsp_o.data(ctrl_burst_en_c)                              <= ctrl(ctrl_burst_en_c);
-            --
-            bus_rsp_o.data(ctrl_phy_busy_c) <= phy_if.busy;
-            bus_rsp_o.data(ctrl_xip_busy_c) <= arbiter.busy;
-          when "10" => -- 'xip_data_lo_addr_c' - SPI direct data access register lo
-            bus_rsp_o.data <= phy_if.rdata;
-          when others => -- unavailable (not implemented or write-only)
-            bus_rsp_o.data <= (others => '0');
-        end case;
+      ctrl           <= (others => '0');
+      spi_data_lo    <= (others => '0');
+      spi_data_hi    <= (others => '0');
+      spi_trigger    <= '0';
+    elsif rising_edge(clk_i) then
+      -- bus handshake --
+      bus_rsp_o.ack  <= bus_req_i.stb;
+      bus_rsp_o.err  <= '0';
+      bus_rsp_o.data <= (others => '0');
+
+      -- defaults --
+      spi_trigger <= '0';
+
+      if (bus_req_i.stb = '1') then
+
+        -- write access --
+        if (bus_req_i.rw = '1') then
+          -- control register --
+          if (bus_req_i.addr(3 downto 2) = "00") then
+            ctrl(ctrl_enable_c)                                <= bus_req_i.data(ctrl_enable_c);
+            ctrl(ctrl_spi_prsc2_c downto ctrl_spi_prsc0_c)     <= bus_req_i.data(ctrl_spi_prsc2_c downto ctrl_spi_prsc0_c);
+            ctrl(ctrl_spi_cpol_c)                              <= bus_req_i.data(ctrl_spi_cpol_c);
+            ctrl(ctrl_spi_cpha_c)                              <= bus_req_i.data(ctrl_spi_cpha_c);
+            ctrl(ctrl_spi_nbytes3_c downto ctrl_spi_nbytes0_c) <= bus_req_i.data(ctrl_spi_nbytes3_c downto ctrl_spi_nbytes0_c);
+            ctrl(ctrl_xip_enable_c)                            <= bus_req_i.data(ctrl_xip_enable_c);
+            ctrl(ctrl_xip_abytes1_c downto ctrl_xip_abytes0_c) <= bus_req_i.data(ctrl_xip_abytes1_c downto ctrl_xip_abytes0_c);
+            ctrl(ctrl_rd_cmd7_c downto ctrl_rd_cmd0_c)         <= bus_req_i.data(ctrl_rd_cmd7_c downto ctrl_rd_cmd0_c);
+            ctrl(ctrl_spi_csen_c)                              <= bus_req_i.data(ctrl_spi_csen_c);
+            ctrl(ctrl_highspeed_c)                             <= bus_req_i.data(ctrl_highspeed_c);
+            ctrl(ctrl_burst_en_c)                              <= bus_req_i.data(ctrl_burst_en_c);
+            ctrl(ctrl_cdiv3_c downto ctrl_cdiv0_c)             <= bus_req_i.data(ctrl_cdiv3_c downto ctrl_cdiv0_c);
+          end if;
+          -- SPI direct data access register lo --
+          if (bus_req_i.addr(3 downto 2) = "10") then
+            spi_data_lo <= bus_req_i.data;
+          end if;
+          -- SPI direct data access register hi --
+          if (bus_req_i.addr(3 downto 2) = "11") then
+            spi_data_hi <= bus_req_i.data;
+            spi_trigger <= '1'; -- trigger direct SPI transaction
+          end if;
+
+        -- read access --
+        else
+          case bus_req_i.addr(3 downto 2) is
+            when "00" => -- 'xip_ctrl_addr_c' - control register
+              bus_rsp_o.data(ctrl_enable_c)                                <= ctrl(ctrl_enable_c);
+              bus_rsp_o.data(ctrl_spi_prsc2_c downto ctrl_spi_prsc0_c)     <= ctrl(ctrl_spi_prsc2_c downto ctrl_spi_prsc0_c);
+              bus_rsp_o.data(ctrl_spi_cpol_c)                              <= ctrl(ctrl_spi_cpol_c);
+              bus_rsp_o.data(ctrl_spi_cpha_c)                              <= ctrl(ctrl_spi_cpha_c);
+              bus_rsp_o.data(ctrl_spi_nbytes3_c downto ctrl_spi_nbytes0_c) <= ctrl(ctrl_spi_nbytes3_c downto ctrl_spi_nbytes0_c);
+              bus_rsp_o.data(ctrl_xip_enable_c)                            <= ctrl(ctrl_xip_enable_c);
+              bus_rsp_o.data(ctrl_xip_abytes1_c downto ctrl_xip_abytes0_c) <= ctrl(ctrl_xip_abytes1_c downto ctrl_xip_abytes0_c);
+              bus_rsp_o.data(ctrl_rd_cmd7_c downto ctrl_rd_cmd0_c)         <= ctrl(ctrl_rd_cmd7_c downto ctrl_rd_cmd0_c);
+              bus_rsp_o.data(ctrl_spi_csen_c)                              <= ctrl(ctrl_spi_csen_c);
+              bus_rsp_o.data(ctrl_highspeed_c)                             <= ctrl(ctrl_highspeed_c);
+              bus_rsp_o.data(ctrl_burst_en_c)                              <= ctrl(ctrl_burst_en_c);
+              bus_rsp_o.data(ctrl_cdiv3_c downto ctrl_cdiv0_c)             <= ctrl(ctrl_cdiv3_c downto ctrl_cdiv0_c);
+              --
+              bus_rsp_o.data(ctrl_phy_busy_c) <= phy_if.busy;
+              bus_rsp_o.data(ctrl_xip_busy_c) <= arbiter.busy;
+            when "10" => -- 'xip_data_lo_addr_c' - SPI direct data access register lo
+              bus_rsp_o.data <= phy_if.rdata;
+            when others => -- unavailable (not implemented or write-only)
+              bus_rsp_o.data <= (others => '0');
+          end case;
+        end if;
+
       end if;
     end if;
-  end process ctrl_read_access;
-
-  -- no access error possible --
-  bus_rsp_o.err <= '0';
+  end process ctrl_bus_access;
 
 
   -- XIP Address Computation Logic ----------------------------------------------------------
@@ -245,9 +255,15 @@ begin
 
   -- SPI Access Arbiter ---------------------------------------------------------------------
   -- -------------------------------------------------------------------------------------------
-  arbiter_sync: process(clk_i)
+  arbiter_sync: process(rstn_i, clk_i)
   begin
-    if rising_edge(clk_i) then
+    if (rstn_i = '0') then
+      arbiter.state          <= S_DIRECT;
+      arbiter.addr           <= (others => '0');
+      arbiter.addr_lookahead <= (others => '0');
+      arbiter.xip_acc_err    <= '0';
+      arbiter.tmo_cnt        <= (others => '0');
+    elsif rising_edge(clk_i) then
       -- state control --
       if (ctrl(ctrl_enable_c) = '0') or (ctrl(ctrl_xip_enable_c) = '0') then -- sync reset
         arbiter.state <= S_DIRECT;
@@ -353,11 +369,29 @@ begin
 
   -- SPI Clock Generator --------------------------------------------------------------------
   -- -------------------------------------------------------------------------------------------
+  clock_generator: process(rstn_i, clk_i)
+  begin
+    if (rstn_i = '0') then
+      spi_clk_en <= '0';
+      cdiv_cnt   <= (others => '0');
+    elsif rising_edge(clk_i) then
+      spi_clk_en <= '0'; -- default
+      if (ctrl(ctrl_enable_c) = '0') then -- reset/disabled
+        cdiv_cnt <= (others => '0');
+      elsif (clkgen_i(to_integer(unsigned(ctrl(ctrl_spi_prsc2_c downto ctrl_spi_prsc0_c)))) = '1') or
+            (ctrl(ctrl_highspeed_c) = '1') then -- pre-scaled clock
+        if (cdiv_cnt = ctrl(ctrl_cdiv3_c downto ctrl_cdiv0_c)) then -- clock divider for fine-tuning
+          spi_clk_en <= '1';
+          cdiv_cnt   <= (others => '0');
+        else
+          cdiv_cnt <= std_ulogic_vector(unsigned(cdiv_cnt) + 1);
+        end if;
+      end if;
+    end if;
+  end process clock_generator;
+
   -- enable clock generator --
   clkgen_en_o <= ctrl(ctrl_enable_c);
-
-  -- clock select --
-  spi_clk_en <= clkgen_i(to_integer(unsigned(ctrl(ctrl_spi_prsc2_c downto ctrl_spi_prsc0_c)))) or ctrl(ctrl_highspeed_c);
 
 
   -- SPI Physical Interface -----------------------------------------------------------------
@@ -365,6 +399,7 @@ begin
   neorv32_xip_phy_inst: neorv32_xip_phy
   port map (
     -- global control --
+    rstn_i       => rstn_i,
     clk_i        => clk_i,
     spi_clk_en_i => spi_clk_en,
     -- operation configuration --
@@ -438,6 +473,7 @@ use neorv32.neorv32_package.all;
 entity neorv32_xip_phy is
   port (
     -- global control --
+    rstn_i       : in  std_ulogic; -- reset, async, low-active
     clk_i        : in  std_ulogic; -- clock
     spi_clk_en_i : in  std_ulogic; -- pre-scaled SPI clock-enable
     -- operation configuration --
@@ -477,9 +513,17 @@ begin
 
   -- Serial Interface Engine ----------------------------------------------------------------
   -- -------------------------------------------------------------------------------------------
-  serial_engine: process(clk_i)
+  serial_engine: process(rstn_i, clk_i)
   begin
-    if rising_edge(clk_i) then
+    if (rstn_i = '0') then
+      spi_clk_o    <= '0';
+      spi_csn_o    <= '1';
+      ctrl.state   <= S_IDLE;
+      ctrl.csen    <= '0';
+      ctrl.sreg    <= (others => '0');
+      ctrl.bitcnt  <= (others => '0');
+      ctrl.di_sync <= '0';
+    elsif rising_edge(clk_i) then
       if (cf_enable_i = '0') then -- sync reset
         spi_clk_o    <= '0';
         spi_csn_o    <= '1';

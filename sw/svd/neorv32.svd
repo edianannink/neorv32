@@ -4,7 +4,7 @@
   <vendor>stnolting</vendor>
   <name>neorv32</name>
   <series>RISC-V</series>
-  <version>1.8.9</version>
+  <version>1.9.2</version>
   <description>The NEORV32 RISC-V Processor</description>
 
   <!-- CPU core -->
@@ -610,6 +610,11 @@
               <description>Enable burst mode (for XIP accesses)</description>
             </field>
             <field>
+              <name>XIP_CTRL_CDIV</name>
+              <bitRange>[24:27]</bitRange>
+              <description>SPI clock divider</description>
+            </field>
+            <field>
               <name>XIP_CTRL_PHY_BUSY</name>
               <bitRange>[30:30]</bitRange>
               <access>read-only</access>
@@ -1053,6 +1058,11 @@
               <name>SPI_CTRL_CDIV</name>
               <bitRange>[13:10]</bitRange>
               <description>SPI clock divider</description>
+            </field>
+            <field>
+              <name>SPI_CTRL_HIGHSPEED</name>
+              <bitRange>[14:14]</bitRange>
+              <description>SPI high-speed mode</description>
             </field>
             <field>
               <name>SPI_CTRL_RX_AVAIL</name>

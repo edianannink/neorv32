@@ -2,16 +2,13 @@
 -- # << NEORV32 CPU - General Purpose Data Register File >>                                        #
 -- # ********************************************************************************************* #
 -- # Data register file. 32 entries (= 1024 bit) for RV32I ISA (default), 16 entries (= 512 bit)   #
--- # for RV32E ISA (when RISC-V "E" extension is enabled).                                         #
+-- # for RV32E ISA (when RISC-V "E" extension is enabled via "RVE_EN").                            #
 -- #                                                                                               #
--- # Register zero (x0) is a "normal" physical register that is set to zero by the CPU control     #
--- # hardware. This is not required for non-BRAM-based register files where x0 is hardwired to     #
--- # zero. Set <reset_x0_c> to 'false' in this case.                                               #
+-- # By default the register file is coded to infer block RAM (for FPGAs), that do no provide a    #
+-- # dedicated hardware reset. For ASIC implementation or setup requiring a dedicated hardware     #
+-- # reset a single-register-based architecture can be enabled via "RST_EN".                       #
 -- #                                                                                               #
--- # The register file uses synchronous read accesses and a *single* (multiplexed) address port    #
--- # for writing and reading rd/rs1 and a single read-only port for rs2. Therefore, the whole      #
--- # register file can be mapped to a single true-dual-port block RAM. A third and a fourth read   #
--- # port can be optionally enabled.                                                               #
+-- # A third and a fourth read port can be optionally enabled ("RS3_EN", "RS4_EN").                #
 -- # ********************************************************************************************* #
 -- # BSD 3-Clause License                                                                          #
 -- #                                                                                               #
@@ -53,19 +50,21 @@ use neorv32.neorv32_package.all;
 
 entity neorv32_cpu_regfile is
   generic (
-    RVE    : boolean; -- implement embedded RF extension?
+    RST_EN : boolean; -- enable dedicated hardware reset ("ASIC style")
+    RVE_EN : boolean; -- implement embedded RF extension
     RS3_EN : boolean; -- enable 3rd read port
     RS4_EN : boolean  -- enable 4th read port
   );
   port (
     -- global control --
     clk_i  : in  std_ulogic; -- global clock, rising edge
+    rstn_i : in  std_ulogic; -- global reset, low-active, async
     ctrl_i : in  ctrl_bus_t; -- main control bus
     -- data input --
     alu_i  : in  std_ulogic_vector(XLEN-1 downto 0); -- ALU result
     mem_i  : in  std_ulogic_vector(XLEN-1 downto 0); -- memory read data
     csr_i  : in  std_ulogic_vector(XLEN-1 downto 0); -- CSR read data
-    pc2_i  : in  std_ulogic_vector(XLEN-1 downto 0); -- next PC
+    ret_i  : in  std_ulogic_vector(XLEN-1 downto 0); -- link PC
     -- data output --
     rs1_o  : out std_ulogic_vector(XLEN-1 downto 0); -- rs1
     rs2_o  : out std_ulogic_vector(XLEN-1 downto 0); -- rs2
@@ -79,20 +78,41 @@ end neorv32_cpu_regfile;
 architecture neorv32_cpu_regfile_rtl of neorv32_cpu_regfile is
 
   -- auto-configuration --
-  constant addr_bits_c : natural := cond_sel_natural_f(RVE, 4, 5); -- address width
+  constant addr_bits_c : natural := cond_sel_natural_f(RVE_EN, 4, 5); -- address width
 
   -- register file --
   type   reg_file_t is array ((2**addr_bits_c)-1 downto 0) of std_ulogic_vector(38 downto 0);
   signal reg_file : reg_file_t := (others => (others => '0'));
 
   -- access --
-  signal rf_wdata : std_ulogic_vector(XLEN-1 downto 0); -- write-back data
-  signal rf_we    : std_ulogic; -- write enable
-  signal rd_zero  : std_ulogic; -- writing to x0?
-  signal opa_addr : std_ulogic_vector(4 downto 0); -- rs1/dst address
-  signal opb_addr : std_ulogic_vector(4 downto 0); -- rs2 address
-  signal opc_addr : std_ulogic_vector(4 downto 0); -- rs3 address
-  signal opd_addr : std_ulogic_vector(4 downto 0); -- rs4 address
+  signal rf_wdata  : std_ulogic_vector(XLEN-1 downto 0); -- write-back data
+  signal rf_we     : std_ulogic; -- write enable
+  signal rf_we_sel : std_ulogic_vector((2**addr_bits_c)-1 downto 0); -- one-hot write enable
+  signal rd_zero   : std_ulogic; -- writing to x0?
+  signal opa_addr  : std_ulogic_vector(4 downto 0); -- rs1/rd address
+  signal rs4_addr  : std_ulogic_vector(4 downto 0); -- rs4 address
+
+  -- ECC signals --
+  signal ecc_enc_out : std_ulogic_vector(38 downto 0);
+  signal ecc_dec_opa_out, ecc_dec_opb_out, ecc_dec_opc_out, ecc_dec_opd_out: std_ulogic_vector(31 downto 0);
+  signal ecc_dec_opa_err_out, ecc_dec_opb_err_out: std_ulogic_vector(1 downto 0);
+  signal ecc_error: std_ulogic_vector(1 downto 0);
+  
+  component prim_secded_39_32_enc
+  port (
+    data_i : in std_ulogic_vector(31 downto 0);
+    data_o : out std_ulogic_vector(38 downto 0)
+  );
+  end component;
+
+  component prim_secded_39_32_dec
+  port (
+    data_i : in std_ulogic_vector(38 downto 0);
+    data_o : out std_ulogic_vector(31 downto 0);
+    syndrome_o : out std_ulogic_vector(6 downto 0);
+    err_o : out std_ulogic_vector(1 downto 0)
+  );
+  end component;
 
   -- ECC signals --
   signal ecc_enc_out : std_ulogic_vector(38 downto 0);
@@ -163,59 +183,123 @@ begin
 
   -- Data Write-Back Select -----------------------------------------------------------------
   -- -------------------------------------------------------------------------------------------
-  wb_select: process(ctrl_i, alu_i, mem_i, csr_i, pc2_i)
+  wb_select: process(ctrl_i, alu_i, mem_i, csr_i, ret_i)
   begin
     case ctrl_i.rf_mux is
       when rf_mux_alu_c => rf_wdata <= alu_i; -- ALU result
       when rf_mux_mem_c => rf_wdata <= mem_i; -- memory read data
       when rf_mux_csr_c => rf_wdata <= csr_i; -- CSR read data
-      when rf_mux_npc_c => rf_wdata <= pc2_i; -- next PC (return/link address)
+      when rf_mux_ret_c => rf_wdata <= ret_i; -- link PC (return address)
       when others       => rf_wdata <= alu_i; -- don't care
     end case;
   end process wb_select;
 
 
-  -- Access Logic ---------------------------------------------------------------------------
+  -- FPGA Register File (no hardware reset) -------------------------------------------------
   -- -------------------------------------------------------------------------------------------
-  -- access addresses --
-  opa_addr <= "00000" when (ctrl_i.rf_zero_we = '1') else -- force rd = zero
-              ctrl_i.rf_rd when (ctrl_i.rf_wb_en = '1') else -- rd
-              ctrl_i.rf_rs1; -- rs1
-  opb_addr <= ctrl_i.rf_rs2; -- rs2
-  opc_addr <= ctrl_i.rf_rs3; -- rs3
-  opd_addr <= ctrl_i.ir_funct12(6 downto 5) & ctrl_i.ir_funct3; -- rs4: [26:25] & [14:12]; not RISC-V-standard!
+  register_file_fpga:
+  if not RST_EN generate
 
-  -- write enable --
-  rd_zero <= '1' when (ctrl_i.rf_rd = "00000") else '0';
-  rf_we   <= (ctrl_i.rf_wb_en and (not rd_zero)) or ctrl_i.rf_zero_we; -- do not allow writes to x0 unless explicitly forced
+    -- Register zero (x0) is a "normal" physical register that is set to zero by the CPU control
+    -- hardware. The register file uses synchronous read accesses and a *single* multiplexed
+    -- address port for writing and reading rd/rs1 and a single read-only port for rs2. Therefore,
+    -- the whole register file can be mapped to a single true-dual-port block RAM.
+
+    rd_zero  <= '1' when (ctrl_i.rf_rd = "00000") else '0';
+    rf_we    <= (ctrl_i.rf_wb_en and (not rd_zero)) or ctrl_i.rf_zero_we; -- never write to x0 unless explicitly forced
+    opa_addr <= "00000" when (ctrl_i.rf_zero_we = '1') else -- force rd = zero
+                ctrl_i.rf_rd when (ctrl_i.rf_wb_en = '1') else -- rd
+                ctrl_i.rf_rs1; -- rs1
+
+    register_file: process(clk_i)
+    begin
+      if rising_edge(clk_i) then
+        if (rf_we = '1') then
+          reg_file(to_integer(unsigned(opa_addr(addr_bits_c-1 downto 0)))) <= rf_wdata;
+        end if;
+        rs1_o <= reg_file(to_integer(unsigned(opa_addr(addr_bits_c-1 downto 0))));
+        rs2_o <= reg_file(to_integer(unsigned(ctrl_i.rf_rs2(addr_bits_c-1 downto 0))));
+      end if;
+    end process register_file;
+
+  end generate;
 
 
-  -- Register File --------------------------------------------------------------------------
+  -- ASIC Register File (full hardware reset) -----------------------------------------------
   -- -------------------------------------------------------------------------------------------
-  register_file: process(clk_i)
-  begin
-    if rising_edge(clk_i) then
-      if (rf_we = '1') then
-        reg_file(to_integer(unsigned(opa_addr(addr_bits_c-1 downto 0)))) <= ecc_enc_out;
-      end if;
-      rs1_o <= ecc_dec_opa_out;
-      rs2_o <= ecc_dec_opb_out;
+  register_file_asic:
+  if RST_EN generate
 
-      -- optional 3rd read port --
-      if (RS3_EN = true) then
-        rs3_o <= ecc_dec_opc_out;
-      else
-        rs3_o <= (others => '0');
+    -- write enable decoder --
+    we_decode: process(ctrl_i)
+    begin
+      rf_we_sel <= (others => '0');
+      if (ctrl_i.rf_wb_en = '1') then
+        rf_we_sel(to_integer(unsigned(ctrl_i.rf_rd(addr_bits_c-1 downto 0)))) <= '1';
       end if;
+    end process we_decode;
 
-      -- optional 4th read port --
-      if (RS4_EN = true) then
-        rs4_o <= ecc_dec_opd_out;
-      else
-        rs4_o <= (others => '0');
+    -- individual registers --
+    reg_gen:
+    for i in 1 to (2**addr_bits_c)-1 generate
+      register_file: process(rstn_i, clk_i)
+      begin
+        if (rstn_i = '0') then
+          reg_file(i) <= (others => '0');
+        elsif rising_edge(clk_i) then
+          if (rf_we_sel(i) = '1') then
+            reg_file(i) <= rf_wdata;
+          end if;
+        end if;
+      end process register_file;
+    end generate;
+
+    reg_file(0) <= (others => '0'); -- x0 is hardwired to zero
+
+    rf_read: process(clk_i)
+    begin
+      if rising_edge(clk_i) then
+        rs1_o <= reg_file(to_integer(unsigned(ctrl_i.rf_rs1(addr_bits_c-1 downto 0))));
+        rs2_o <= reg_file(to_integer(unsigned(ctrl_i.rf_rs2(addr_bits_c-1 downto 0))));
       end if;
-    end if;
-  end process register_file;
+    end process rf_read;
+
+  end generate;
+
+
+  -- Additional Read Ports ------------------------------------------------------------------
+  -- -------------------------------------------------------------------------------------------
+  rs3_enable: -- optional 3rd read port
+  if RS3_EN generate
+    rs3_read: process(clk_i)
+    begin
+      if rising_edge(clk_i) then
+        rs3_o <= reg_file(to_integer(unsigned(ctrl_i.rf_rs3(addr_bits_c-1 downto 0))));
+      end if;
+    end process rs3_read;
+  end generate;
+
+  rs3_disable:
+  if not RS3_EN generate
+    rs3_o <= (others => '0');
+  end generate;
+
+
+  rs4_enable: -- optional 4th read port
+  if RS4_EN generate
+    rs4_read: process(clk_i)
+    begin
+      if rising_edge(clk_i) then
+        rs4_o <= reg_file(to_integer(unsigned(rs4_addr(addr_bits_c-1 downto 0))));
+      end if;
+    end process rs4_read;
+    rs4_addr <= ctrl_i.ir_funct12(6 downto 5) & ctrl_i.ir_funct3; -- rs4: [26:25] & [14:12]; not RISC-V-standard!
+  end generate;
+
+  rs4_disable:
+  if not RS4_EN generate
+    rs4_o <= (others => '0');
+  end generate;
 
 
 end neorv32_cpu_regfile_rtl;

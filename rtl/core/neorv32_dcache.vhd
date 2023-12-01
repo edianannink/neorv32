@@ -61,8 +61,17 @@ end neorv32_dcache;
 
 architecture neorv32_dcache_rtl of neorv32_dcache is
 
+  -- make sure caches sizes are a power of two --
+  constant nblocks_valid_c : boolean := is_power_of_two_f(DCACHE_NUM_BLOCKS);
+  constant nblocks_pow2_c  : natural := 2**index_size_f(DCACHE_NUM_BLOCKS);
+  constant nblocks_c       : natural := cond_sel_natural_f(nblocks_valid_c, DCACHE_NUM_BLOCKS, nblocks_pow2_c);
+  --
+  constant block_size_valid_c : boolean := is_power_of_two_f(DCACHE_BLOCK_SIZE);
+  constant block_size_pow2_c  : natural := 2**index_size_f(DCACHE_BLOCK_SIZE);
+  constant block_size_c       : natural := cond_sel_natural_f(block_size_valid_c, DCACHE_BLOCK_SIZE, block_size_pow2_c);
+
   -- cache layout --
-  constant cache_offset_size_c : natural := index_size_f(DCACHE_BLOCK_SIZE/4); -- offset addresses full 32-bit words
+  constant cache_offset_size_c : natural := index_size_f(block_size_c/4); -- offset addresses full 32-bit words
 
   -- cache memory --
   component neorv32_dcache_memory
@@ -72,6 +81,7 @@ architecture neorv32_dcache_rtl of neorv32_dcache is
   );
   port (
     -- global control --
+    rstn_i       : in  std_ulogic; -- global reset, async, low-active
     clk_i        : in  std_ulogic; -- global clock, rising edge
     clear_i      : in  std_ulogic; -- invalidate whole cache
     hit_o        : out std_ulogic; -- hit access
@@ -123,10 +133,8 @@ begin
 
   -- Sanity Checks --------------------------------------------------------------------------
   -- -------------------------------------------------------------------------------------------
-  assert not (is_power_of_two_f(DCACHE_NUM_BLOCKS) = false) report
-    "NEORV32 PROCESSOR CONFIG ERROR! d-cache number of blocks <DCACHE_NUM_BLOCKS> has to be a power of 2." severity error;
-  assert not (is_power_of_two_f(DCACHE_BLOCK_SIZE) = false) report
-    "NEORV32 PROCESSOR CONFIG ERROR! d-cache block size <DCACHE_BLOCK_SIZE> has to be a power of 2." severity error;
+  assert not ((nblocks_valid_c = false) or (block_size_valid_c = false)) report
+    "[NEORV32] Auto-adjusting invalid d-cache size configuration(s)." severity warning;
 
 
   -- Control Engine FSM Sync ----------------------------------------------------------------
@@ -313,11 +321,12 @@ begin
   -- -------------------------------------------------------------------------------------------
   neorv32_dcache_memory_inst: neorv32_dcache_memory
   generic map (
-    DCACHE_NUM_BLOCKS => DCACHE_NUM_BLOCKS,
-    DCACHE_BLOCK_SIZE => DCACHE_BLOCK_SIZE
+    DCACHE_NUM_BLOCKS => nblocks_c,
+    DCACHE_BLOCK_SIZE => block_size_c
   )
   port map (
     -- global control --
+    rstn_i       => rstn_i,
     clk_i        => clk_i,
     clear_i      => cache.clear,
     hit_o        => cache.hit,
@@ -389,6 +398,7 @@ entity neorv32_dcache_memory is
   );
   port (
     -- global control --
+    rstn_i       : in  std_ulogic; -- global reset, async, low-active
     clk_i        : in  std_ulogic; -- global clock, rising edge
     clear_i      : in  std_ulogic; -- invalidate whole cache
     hit_o        : out std_ulogic;  -- hit access
@@ -460,9 +470,12 @@ begin
 
 	-- Status Flag Memory ---------------------------------------------------------------------
   -- -------------------------------------------------------------------------------------------
-  status_memory: process(clk_i)
+  status_memory: process(rstn_i, clk_i)
   begin
-    if rising_edge(clk_i) then
+    if (rstn_i = '0') then
+      valid_flag <= (others => '0');
+      valid      <= '0';
+    elsif rising_edge(clk_i) then
       -- write access --
       if (clear_i = '1') then -- invalidate entire cache
         valid_flag <= (others => '0');
@@ -479,7 +492,7 @@ begin
   -- -------------------------------------------------------------------------------------------
   tag_memory: process(clk_i)
   begin
-    if rising_edge(clk_i) then
+    if rising_edge(clk_i) then -- no reset to allow inferring of blockRAM
       if (ctrl_we_i = '1') then -- write access
         tag_mem(to_integer(unsigned(cache_index))) <= ctrl_acc_addr.tag;
       else -- read access
@@ -496,7 +509,7 @@ begin
   -- -------------------------------------------------------------------------------------------
   cache_mem_access: process(clk_i)
   begin
-    if rising_edge(clk_i) then
+    if rising_edge(clk_i) then -- no reset to allow inferring of blockRAM
       -- write access --
       if (ctrl_we_i = '1') and (ctrl_ben_i(0) = '1') then
         cache_data_memory_b0(to_integer(unsigned(cache_addr))) <= ctrl_wdata_i(07 downto 00);

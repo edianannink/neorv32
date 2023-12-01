@@ -49,10 +49,10 @@
 /**@{*/
 //** UART BAUD rate */
 #define BAUD_RATE           (19200)
-//** Reachable unaligned address */
+//** Reachable but unaligned address */
 #define ADDR_UNALIGNED_1    (0x00000001UL)
-//** Reachable unaligned address */
-#define ADDR_UNALIGNED_2    (0x00000002UL)
+//** Reachable but unaligned address */
+#define ADDR_UNALIGNED_3    (0x00000003UL)
 //** Unreachable word-aligned address */
 #define ADDR_UNREACHABLE    ((uint32_t)&NEORV32_DM->SREG)
 //** Read-only word-aligned address */
@@ -84,9 +84,12 @@
 // Prototypes
 void sim_irq_trigger(uint32_t sel);
 void global_trap_handler(void);
+void rte_service_handler(void);
 void vectored_irq_table(void) __attribute__((naked, aligned(128)));
 void vectored_global_handler(void) __attribute__((interrupt("machine")));
 void vectored_mei_handler(void) __attribute__((interrupt("machine")));
+void __attribute__ ((interrupt)) hw_breakpoint_handler(void);
+void __attribute__ ((noinline)) trigger_module_dummy(void);
 void xirq_trap_handler0(void);
 void xirq_trap_handler1(void);
 void test_ok(void);
@@ -95,31 +98,21 @@ void test_fail(void);
 // MCAUSE value that will be NEVER set by the hardware
 const uint32_t mcause_never_c = 0x80000000UL; // = reserved
 
-// Global variables (also test initialization of global vars here)
-/// Global counter for failing tests
-int cnt_fail = 0;
-/// Global counter for successful tests
-int cnt_ok   = 0;
-/// Global counter for total number of tests
-int cnt_test = 0;
-/// Global number of available HPMs
-uint32_t num_hpm_cnts_global = 0;
-/// Vectored MEI trap handler acknowledge
-volatile int vectored_mei_handler_ack = 0;
-/// XIRQ trap handler acknowledge
-uint32_t xirq_trap_handler_ack = 0;
-/// DMA source & destination data
-volatile uint32_t dma_src;
-/// Variable to test store accesses
-volatile uint32_t store_access_addr[2];
-/// Variable for testing atomic memory accesses
-volatile uint32_t amo_var;
-/// Variable to test PMP
-volatile uint32_t __attribute__((aligned(4))) pmp_access[2];
-/// Number of triggered traps
-volatile uint32_t trap_cnt;
-/// Number of implemented PMP regions
-uint32_t pmp_num_regions;
+// Global variables
+volatile int cnt_fail = 0; // global counter for failing tests
+volatile int cnt_ok   = 0; // global counter for successful tests
+volatile int cnt_test = 0; // global counter for total number of tests
+volatile uint32_t num_hpm_cnts_global = 0; // global number of available hpms
+volatile int vectored_mei_handler_ack = 0; // vectored mei trap handler acknowledge
+volatile uint32_t xirq_trap_handler_ack = 0; // xirq trap handler acknowledge
+volatile uint32_t hw_brk_mscratch_ok = 0; // set when mepc was correct in trap handler
+
+volatile uint32_t dma_src; // dma source & destination data
+volatile uint32_t store_access_addr[2]; // variable to test store accesses
+volatile uint32_t amo_var; // variable for testing atomic memory accesses
+volatile uint32_t __attribute__((aligned(4))) pmp_access[2]; // variable to test pmp
+volatile uint32_t trap_cnt; // number of triggered traps
+volatile uint32_t pmp_num_regions; // number of implemented pmp regions
 
 
 /**********************************************************************//**
@@ -292,9 +285,9 @@ int main() {
   cnt_test++;
 
   asm volatile ("fence"); // flush/reload d-cache
-  if (neorv32_cpu_csr_read(CSR_MXISA) & (1 << CSR_MXISA_ZIFENCEI)) {
-    asm volatile ("fence.i"); // clear instruction prefetch buffer and clear i-cache
-  }
+  asm volatile ("fence.i"); // clear instruction prefetch buffer and clear i-cache
+  asm volatile ("fence");
+  asm volatile ("fence.i");
 
   if (neorv32_cpu_csr_read(CSR_MCAUSE) == mcause_never_c) {
     test_ok();
@@ -581,11 +574,13 @@ int main() {
 
     cnt_test++;
 
-    // call unaligned address
-    ((void (*)(void))ADDR_UNALIGNED_2)();
-    asm volatile ("nop");
+    tmp_a = 0;
+    tmp_b = (uint32_t)ADDR_UNALIGNED_3;
+    asm volatile ("li   %[link], 0x123   \n" // initialize link register with known value
+                  "jalr %[link], 0(%[addr])" // must not update link register due to exception
+                  : [link] "=r" (tmp_a) : [addr] "r" (tmp_b));
 
-    if (neorv32_cpu_csr_read(CSR_MCAUSE) == TRAP_CODE_I_MISALIGNED) {
+    if ((neorv32_cpu_csr_read(CSR_MCAUSE) == TRAP_CODE_I_MISALIGNED) && (tmp_a == 0x123)) {
       test_ok();
     }
     else {
@@ -652,7 +647,7 @@ int main() {
     asm volatile (".word 0x7b200073"); // dret outside of debug mode
     asm volatile (".word 0x7b300073"); // illegal system funct12
     asm volatile (".word 0xfe000033"); // illegal add funct7
-    asm volatile (".word 0x00002063"); // illegal branch funct3
+    asm volatile (".word 0x80002063"); // illegal branch funct3
     asm volatile (".word 0x0000200f"); // illegal fence funct3
     asm volatile (".word 0xfe002fe3"); // illegal store funct3
     asm volatile (".align 4");
@@ -757,7 +752,7 @@ int main() {
 
   // load from unreachable aligned address
   asm volatile ("li %[da], 0xcafe1230 \n" // initialize destination register with known value
-                "lw %[da], 0(%[ad])     " // must not update destination register to to exception
+                "lw %[da], 0(%[ad])     " // must not update destination register due to exception
                 : [da] "=r" (tmp_b) : [ad] "r" (ADDR_UNREACHABLE));
 
   if ((neorv32_cpu_csr_read(CSR_MCAUSE) == TRAP_CODE_L_ACCESS) && // load bus access error exception
@@ -1624,6 +1619,7 @@ int main() {
   // ----------------------------------------------------------
   // Fast interrupt channel 14 (SLINK)
   // ----------------------------------------------------------
+  neorv32_cpu_csr_write(CSR_MCAUSE, mcause_never_c);
   PRINT_STANDARD("[%i] FIRQ14 (SLINK) ", cnt_test);
 
   if (NEORV32_SYSINFO->SOC & (1 << SYSINFO_SOC_IO_SLINK)) {
@@ -1661,6 +1657,7 @@ int main() {
   // ----------------------------------------------------------
   // Fast interrupt channel 15 (TRNG)
   // ----------------------------------------------------------
+  neorv32_cpu_csr_write(CSR_MCAUSE, mcause_never_c);
   PRINT_STANDARD("[%i] FIRQ15 (TRNG) ", cnt_test);
 
   if (NEORV32_SYSINFO->SOC & (1 << SYSINFO_SOC_IO_TRNG)) {
@@ -1688,6 +1685,50 @@ int main() {
   }
   else {
     PRINT_STANDARD("[n.a.]\n");
+  }
+
+
+  // ----------------------------------------------------------
+  // RTE context modification
+  // implemented as "system service call"
+  // ----------------------------------------------------------
+  neorv32_cpu_csr_write(CSR_MCAUSE, mcause_never_c);
+  PRINT_STANDARD("[%i] RTE context ", cnt_test);
+  cnt_test++;
+
+  // install ecall service handler
+  neorv32_rte_handler_install(RTE_TRAP_MENV_CALL, rte_service_handler);
+  neorv32_rte_handler_install(RTE_TRAP_UENV_CALL, rte_service_handler);
+
+  // make sure all arguments are passed via specific register
+  register uint32_t syscall_a0 asm ("a0");
+  register uint32_t syscall_a1 asm ("a1");
+  register uint32_t syscall_a2 asm ("a2");
+  uint32_t syscall_res = 0;
+
+  // try to execute service call in user mode
+  // hart will be back in MACHINE mode when trap handler returns
+  neorv32_cpu_goto_user_mode();
+  {
+    syscall_a0 = 127;
+    syscall_a1 = 12000;
+    syscall_a2 = 628;
+
+    asm volatile ("ecall" : "=r" (syscall_a0) : "r" (syscall_a0), "r" (syscall_a1), "r" (syscall_a2));
+    syscall_res = syscall_a0; // backup result before a0 is used for something else
+  }
+
+  // restore initial trap handlers
+  neorv32_rte_handler_install(RTE_TRAP_MENV_CALL, global_trap_handler);
+  neorv32_rte_handler_install(RTE_TRAP_UENV_CALL, global_trap_handler);
+
+  if (((neorv32_cpu_csr_read(CSR_MCAUSE) == TRAP_CODE_MENV_CALL) ||
+       (neorv32_cpu_csr_read(CSR_MCAUSE) == TRAP_CODE_UENV_CALL)) &&
+       (syscall_res == 12628)) { // correct "service" result
+    test_ok();
+  }
+  else {
+    test_fail();
   }
 
 
@@ -1822,6 +1863,55 @@ int main() {
     else {
       test_fail();
     }
+  }
+  else {
+    PRINT_STANDARD("[n.a.]\n");
+  }
+
+
+  // ----------------------------------------------------------
+  // Test trigger module (hardware breakpoint)
+  // ----------------------------------------------------------
+  neorv32_cpu_csr_write(CSR_MCAUSE, mcause_never_c);
+  PRINT_STANDARD("[%i] Trigger module (HW breakpoint) ", cnt_test);
+
+  if (neorv32_cpu_csr_read(CSR_MXISA) & (1 << CSR_MXISA_SDTRIG)) {
+    cnt_test++;
+
+    // back-up RTE
+    uint32_t rte_bak = neorv32_cpu_csr_read(CSR_MTVEC);
+
+    // install hardware-breakpoint handler
+    neorv32_cpu_csr_write(CSR_MTVEC, (uint32_t)&hw_breakpoint_handler);
+
+    // setup test registers
+    neorv32_cpu_csr_write(CSR_MSCRATCH, 0);
+    hw_brk_mscratch_ok = 0;
+
+    // setup hardware breakpoint
+    neorv32_cpu_csr_write(CSR_TDATA2, (uint32_t)(&trigger_module_dummy)); // triggering address
+    neorv32_cpu_csr_write(CSR_TDATA1, (1 <<  2) | // exe    = 1: enable trigger module execution
+                                      (0 << 12)); // action = 0: breakpoint exception, do not enter debug-mode
+
+    // call the hw-breakpoint triggering function
+    trigger_module_dummy();
+
+    if ((neorv32_cpu_csr_read(CSR_MCAUSE) == TRAP_CODE_BREAKPOINT) && // correct exception cause
+        (neorv32_cpu_csr_read(CSR_MSCRATCH) == 4) && // breakpoint-triggering function was finally executed
+        (neorv32_cpu_csr_read(CSR_MEPC) == neorv32_cpu_csr_read(CSR_TDATA2)) && // mepc has to be set to the triggering instruction address
+        (neorv32_cpu_csr_read(CSR_TDATA1) & (1 << 22)) && // trigger has fired
+        (hw_brk_mscratch_ok == 1)) { // make sure mepc was correct in trap handler
+      test_ok();
+    }
+    else {
+      test_fail();
+    }
+
+    // shut-down and reset trigger
+    neorv32_cpu_csr_write(CSR_TDATA1, 0);
+
+    // restore RTE
+    neorv32_cpu_csr_write(CSR_MTVEC, rte_bak);
   }
   else {
     PRINT_STANDARD("[n.a.]\n");
@@ -2158,13 +2248,33 @@ void global_trap_handler(void) {
 
   // hack: make "instruction access fault" exception resumable as we *exactly* know how to handle it in this case
   if (cause == TRAP_CODE_I_ACCESS) {
-    neorv32_cpu_csr_write(CSR_MEPC, neorv32_cpu_csr_read(CSR_MEPC) + 4);
+    neorv32_cpu_csr_write(CSR_MEPC, (uint32_t)EXT_MEM_BASE+0);
   }
 
   // increment global trap counter
   trap_cnt++;
 
   // hack: always come back in MACHINE MODE
+  neorv32_cpu_csr_set(CSR_MSTATUS, (1<<CSR_MSTATUS_MPP_H) | (1<<CSR_MSTATUS_MPP_L));
+}
+
+
+/**********************************************************************//**
+ * RTE's ecall "system service handler"; modifies application context to provide "system services"
+ **************************************************************************/
+void rte_service_handler(void) {
+
+  // get service arguments
+  uint32_t arg0 = neorv32_rte_context_get(10); // a0
+  uint32_t arg1 = neorv32_rte_context_get(11); // a1
+  uint32_t arg2 = neorv32_rte_context_get(12); // a2
+
+  // valid service?
+  if (arg0 == 127) {
+    neorv32_rte_context_put(10, arg1 + arg2); // service result in a0
+  }
+
+  // hack: return in MACHINE MODE
   neorv32_cpu_csr_set(CSR_MSTATUS, (1<<CSR_MSTATUS_MPP_H) | (1<<CSR_MSTATUS_MPP_L));
 }
 
@@ -2221,6 +2331,31 @@ void vectored_global_handler(void) {
 void vectored_mei_handler(void) {
 
   vectored_mei_handler_ack = 1; // successfully called
+}
+
+
+/**********************************************************************//**
+ * Hardware-breakpoint trap handler
+ **************************************************************************/
+void __attribute__ ((interrupt)) hw_breakpoint_handler(void) {
+
+  // make sure mscratch has not been updated yet
+  if (neorv32_cpu_csr_read(CSR_MSCRATCH) == 0) {
+    hw_brk_mscratch_ok += 1;
+  }
+
+  // [NOTE] do not update MEPC here as hardware-breakpoint exceptions will set
+  // MEPC to the address of the instruction thats has NOT BEEN EXECUTED yet
+}
+
+
+/**********************************************************************//**
+ * Test function for the trigger module
+ **************************************************************************/
+void __attribute__ ((noinline,naked)) trigger_module_dummy(void) {
+
+  asm volatile ("csrwi mscratch, 4 \n" // hardware breakpoint should trigger before executing this
+                "ret               \n");
 }
 
 

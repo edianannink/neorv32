@@ -29,7 +29,7 @@ image::neorv32_processor.png[align=center]
 * _optional_ 8-bit serial data device interface (<<_serial_data_interface_controller_spi,**SDI**>>)
 * _optional_ two wire serial interface controller (<<_two_wire_serial_interface_controller_twi,**TWI**>>), compatible to the I²C standard
 * _optional_ general purpose parallel IO port (<<_general_purpose_input_and_output_port_gpio,**GPIO**>>), 64xOut, 64xIn
-* _optional_ 32-bit external bus interface, Wishbone b4 / AXI4-Lite compatible (<<_processor_external_memory_interface_wishbone_axi4_lite,**WISHBONE**>>)
+* _optional_ 32-bit external bus interface, Wishbone b4 / AXI4-Lite compatible (<<_processor_external_memory_interface_wishbone,**WISHBONE**>>)
 * _optional_ watchdog timer (<<_watchdog_timer_wdt,**WDT**>>)
 * _optional_ PWM controller with up to 12 channels & 8-bit duty cycle resolution (<<_pulse_width_modulation_controller_pwm,**PWM**>>)
 * _optional_ ring-oscillator-based true random number generator (<<_true_random_number_generator_trng,**TRNG**>>)
@@ -183,12 +183,6 @@ If optional modules (like CPU extensions or peripheral devices) are not enabled 
 will not be synthesized at all. Hence, the disabled modules do not increase area and power requirements
 and do not impact timing.
 
-.Configuration Check
-[NOTE]
-Not all configuration combinations are valid. The processor RTL code provides sanity checks to inform the user
-during synthesis/simulation if an invalid combination has been detected. It is recommended to run a quick simulation
-using the provided simulation/GHDL scripts to verify the configuration of the processor generics.
-
 .Table Abbreviations
 [NOTE]
 The generic type "`suv(x:y)`" is an abbreviation for "`std_ulogic_vector(x downto y)`".
@@ -208,21 +202,21 @@ The generic type "`suv(x:y)`" is an abbreviation for "`std_ulogic_vector(x downt
 | `ON_CHIP_DEBUGGER_EN` | boolean | false | Implement the on-chip debugger and the CPU debug mode.
 | `DM_LEGACY_MODE`      | boolean | false | Debug module spec. version: `false` = v1.0, `true` = v0.13 (legacy mode).
 4+^| **CPU <<_instruction_sets_and_extensions>>**
-| `CPU_EXTENSION_RISCV_A`        | boolean | false | Enable <<_a_isa_extension>> (atomic memory accesses).
-| `CPU_EXTENSION_RISCV_B`        | boolean | false | Enable <<_b_isa_extension>> (bit-manipulation).
-| `CPU_EXTENSION_RISCV_C`        | boolean | false | Enable <<_c_isa_extension>> (compressed instructions).
-| `CPU_EXTENSION_RISCV_E`        | boolean | false | Enable <<_e_isa_extension>> (reduced register file size).
-| `CPU_EXTENSION_RISCV_M`        | boolean | false | Enable <<_m_isa_extension>> (hardware-based integer multiplication and division).
-| `CPU_EXTENSION_RISCV_U`        | boolean | false | Enable <<_u_isa_extension>> (less-privileged user mode).
-| `CPU_EXTENSION_RISCV_Zfinx`    | boolean | false | Enable <<_zfinx_isa_extension>> (single-precision floating-point unit).
-| `CPU_EXTENSION_RISCV_Zicntr`   | boolean | true  | Enable <<_zicntr_isa_extension>> (CPU base counters).
-| `CPU_EXTENSION_RISCV_Zihpm`    | boolean | false | Enable <<_zihpm_isa_extension>> (hardware performance monitors).
-| `CPU_EXTENSION_RISCV_Zifencei` | boolean | false | Enable <<_zifencei_isa_extension>> (instruction stream synchronization).
-| `CPU_EXTENSION_RISCV_Zmmul`    | boolean | false | Enable <<_zmmul_isa_extension>> (hardware-based integer multiplication).
-| `CPU_EXTENSION_RISCV_Zxcfu`    | boolean | false | Enable NEORV32-specific <<_zxcfu_isa_extension>> (custom RISC-V instructions).
-4+^| **CPU Tuning Options**
-| `FAST_MUL_EN`           | boolean   | false      | Implement fast (but large) full-parallel multipliers (trying to infer DSP blocks).
-| `FAST_SHIFT_EN`         | boolean   | false      | Implement fast (but large) full-parallel barrel shifters.
+| `CPU_EXTENSION_RISCV_A`      | boolean | false | Enable <<_a_isa_extension>> (atomic memory accesses).
+| `CPU_EXTENSION_RISCV_B`      | boolean | false | Enable <<_b_isa_extension>> (bit-manipulation).
+| `CPU_EXTENSION_RISCV_C`      | boolean | false | Enable <<_c_isa_extension>> (compressed instructions).
+| `CPU_EXTENSION_RISCV_E`      | boolean | false | Enable <<_e_isa_extension>> (reduced register file size).
+| `CPU_EXTENSION_RISCV_M`      | boolean | false | Enable <<_m_isa_extension>> (hardware-based integer multiplication and division).
+| `CPU_EXTENSION_RISCV_U`      | boolean | false | Enable <<_u_isa_extension>> (less-privileged user mode).
+| `CPU_EXTENSION_RISCV_Zfinx`  | boolean | false | Enable <<_zfinx_isa_extension>> (single-precision floating-point unit).
+| `CPU_EXTENSION_RISCV_Zicntr` | boolean | true  | Enable <<_zicntr_isa_extension>> (CPU base counters).
+| `CPU_EXTENSION_RISCV_Zihpm`  | boolean | false | Enable <<_zihpm_isa_extension>> (hardware performance monitors).
+| `CPU_EXTENSION_RISCV_Zmmul`  | boolean | false | Enable <<_zmmul_isa_extension>> (hardware-based integer multiplication).
+| `CPU_EXTENSION_RISCV_Zxcfu`  | boolean | false | Enable NEORV32-specific <<_zxcfu_isa_extension>> (custom RISC-V instructions).
+4+^| **CPU <<_architecture>> Tuning Options**
+| `FAST_MUL_EN`           | boolean   | false      | Implement fast but large full-parallel multipliers (trying to infer DSP blocks); see section <<_cpu_arithmetic_logic_unit>>.
+| `FAST_SHIFT_EN`         | boolean   | false      | Implement fast but large full-parallel barrel shifters; see section <<_cpu_arithmetic_logic_unit>>.
+| `REGFILE_HW_RST`        | boolean   | false      | Implement full hardware reset for register file (prevent inferring of BRAM); see section <<_cpu_register_file>>.
 4+^| **Physical Memory Protection (<<_pmp_isa_extension>>)**
 | `PMP_NUM_REGIONS`       | natural   | 0          | Number of implemented PMP regions (0..16).
 | `PMP_MIN_GRANULARITY`   | natural   | 4          | Minimal region granularity in bytes. Has to be a power of two, min 4.
@@ -371,13 +365,9 @@ a valid reset of the entire processor. The internal global reset is asserted _ay
 `rstn_i` signal. For internal reset sources, the global reset is asserted _synchronously_. If the reset cause gets inactive
 the internal reset is de-asserted _synchronously_ at a falling clock edge.
 
-Internally, all processor registers that actually do provide a hardware reset use an **asynchronous reset**. An asynchronous
-reset ensures that the entire processor logic is reset to a defined state even if the main clock is not yet operational.
-
-In order to reduce routing constraints (and by this the actual hardware requirements), some _uncritical registers_
-of the NEORV32 CPU as well as many registers of the entire NEORV32 Processor do not use a dedicated hardware reset.
-For example there are several pipeline registers and "buffer" registers that do not require a defined
-initial state to ensure correct operation.
+Internally, **all registers** that are not meant for mapping to blockRAM (like the register file) do provide a dedicated and
+low-active **asynchronous hardware reset**. This asynchronous reset ensures that the entire processor logic is reset to a
+defined state even if the main clock is not operational yet.
 
 [NOTE]
 The system reset will only reset the control registers of each implemented IO/peripheral module. This control register

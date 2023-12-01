@@ -57,7 +57,6 @@ entity neorv32_cpu is
     CPU_EXTENSION_RISCV_Zfinx    : boolean; -- implement 32-bit floating-point extension (using INT reg!)
     CPU_EXTENSION_RISCV_Zicntr   : boolean; -- implement base counters?
     CPU_EXTENSION_RISCV_Zihpm    : boolean; -- implement hardware performance monitors?
-    CPU_EXTENSION_RISCV_Zifencei : boolean; -- implement instruction stream sync.?
     CPU_EXTENSION_RISCV_Zmmul    : boolean; -- implement multiply-only M sub-extension?
     CPU_EXTENSION_RISCV_Zxcfu    : boolean; -- implement custom (instr.) functions unit?
     CPU_EXTENSION_RISCV_Sdext    : boolean; -- implement external debug mode extension?
@@ -65,6 +64,7 @@ entity neorv32_cpu is
     -- Tuning Options --
     FAST_MUL_EN                  : boolean; -- use DSPs for M extension's multiplier
     FAST_SHIFT_EN                : boolean; -- use barrel shifter for shift operations
+    REGFILE_HW_RST               : boolean; -- implement full hardware reset for register file
     -- Physical Memory Protection (PMP) --
     PMP_NUM_REGIONS              : natural range 0 to 16; -- number of regions (0..16)
     PMP_MIN_GRANULARITY          : natural; -- minimal region granularity in bytes, has to be a power of 2, min 4 bytes
@@ -140,7 +140,7 @@ architecture neorv32_cpu_rtl of neorv32_cpu is
   signal be_store     : std_ulogic; -- bus error on store data access
   signal fetch_pc     : std_ulogic_vector(XLEN-1 downto 0); -- pc for instruction fetch
   signal curr_pc      : std_ulogic_vector(XLEN-1 downto 0); -- current pc (for currently executed instruction)
-  signal next_pc      : std_ulogic_vector(XLEN-1 downto 0); -- next pc (for next executed instruction)
+  signal link_pc      : std_ulogic_vector(XLEN-1 downto 0); -- link pc (return address)
   signal pmp_ex_fault : std_ulogic; -- PMP instruction fetch fault
   signal pmp_rw_fault : std_ulogic; -- PMP read/write access fault
   signal ecc_regfile_error : std_ulogic_vector(1 downto 0); -- ECC error in CPU register file
@@ -149,46 +149,38 @@ begin
 
   -- Sanity Checks --------------------------------------------------------------------------
   -- -------------------------------------------------------------------------------------------
-  -- say hello --
-  assert false report
-    "The NEORV32 RISC-V Processor, Version 0x" & to_hstring32_f(hw_version_c) & " - github.com/stnolting/neorv32" severity note;
-
   -- CPU ISA configuration --
   assert false report
-    "NEORV32 CPU Configuration: RV32" &
-    cond_sel_string_f(CPU_EXTENSION_RISCV_E,        "E", "I") &
-    cond_sel_string_f(CPU_EXTENSION_RISCV_M,        "M", "") &
-    cond_sel_string_f(CPU_EXTENSION_RISCV_A,        "A", "") &
-    cond_sel_string_f(CPU_EXTENSION_RISCV_C,        "C", "") &
-    cond_sel_string_f(CPU_EXTENSION_RISCV_B,        "B", "") &
-    cond_sel_string_f(CPU_EXTENSION_RISCV_U,        "U", "") &
-    cond_sel_string_f(true,                         "_Zicsr", "") & -- always enabled
-    cond_sel_string_f(CPU_EXTENSION_RISCV_Zicntr,   "_Zicntr", "") &
-    cond_sel_string_f(CPU_EXTENSION_RISCV_Zifencei, "_Zifencei", "") &
-    cond_sel_string_f(CPU_EXTENSION_RISCV_Zfinx,    "_Zfinx", "") &
-    cond_sel_string_f(CPU_EXTENSION_RISCV_Zihpm,    "_Zihpm", "") &
-    cond_sel_string_f(CPU_EXTENSION_RISCV_Zmmul,    "_Zmmul", "") &
-    cond_sel_string_f(CPU_EXTENSION_RISCV_Zxcfu,    "_Zxcfu", "") &
-    cond_sel_string_f(CPU_EXTENSION_RISCV_Sdext,    "_Sdext", "") &
-    cond_sel_string_f(CPU_EXTENSION_RISCV_Sdtrig,   "_Sdtrig", "") &
-    cond_sel_string_f(pmp_enable_c,                 "_Smpmp", "")
+    "[NEORV32] CPU ISA: rv32" &
+    cond_sel_string_f(CPU_EXTENSION_RISCV_E,      "e",         "i") &
+    cond_sel_string_f(CPU_EXTENSION_RISCV_M,      "m",         "" ) &
+    cond_sel_string_f(CPU_EXTENSION_RISCV_A,      "a",         "" ) &
+    cond_sel_string_f(CPU_EXTENSION_RISCV_C,      "c",         "" ) &
+    cond_sel_string_f(CPU_EXTENSION_RISCV_B,      "b",         "" ) &
+    cond_sel_string_f(CPU_EXTENSION_RISCV_U,      "u",         "" ) &
+    cond_sel_string_f(true,                       "_zicsr",    "" ) & -- always enabled
+    cond_sel_string_f(CPU_EXTENSION_RISCV_Zicntr, "_zicntr",   "" ) &
+    cond_sel_string_f(true,                       "_zifencei", "" ) & -- always enabled
+    cond_sel_string_f(CPU_EXTENSION_RISCV_Zfinx,  "_zfinx",    "" ) &
+    cond_sel_string_f(CPU_EXTENSION_RISCV_Zihpm,  "_zihpm",    "" ) &
+    cond_sel_string_f(CPU_EXTENSION_RISCV_Zmmul,  "_zmmul",    "" ) &
+    cond_sel_string_f(CPU_EXTENSION_RISCV_Zxcfu,  "_zxcfu",    "" ) &
+    cond_sel_string_f(CPU_EXTENSION_RISCV_Sdext,  "_sdext",    "" ) &
+    cond_sel_string_f(CPU_EXTENSION_RISCV_Sdtrig, "_sdtrig",   "" ) &
+    cond_sel_string_f(pmp_enable_c,               "_smpmp",    "" )
+    severity note;
+
+  -- CPU tuning options --
+  assert false report
+    "[NEORV32] CPU tuning options: " &
+    cond_sel_string_f(FAST_MUL_EN,    "fast_mul ",   "") &
+    cond_sel_string_f(FAST_SHIFT_EN,  "fast_shift ", "" ) &
+    cond_sel_string_f(REGFILE_HW_RST, "rf_hw_rst",   "" )
     severity note;
 
   -- simulation notifier --
   assert not (is_simulation_c = true) report
-    "NEORV32 CPU WARNING! Assuming this is a simulation." severity warning;
-
-  -- CPU boot address --
-  assert not (CPU_BOOT_ADDR(1 downto 0) /= "00") report
-    "NEORV32 CPU CONFIG ERROR! <CPU_BOOT_ADDR> has to be 32-bit aligned." severity error;
-
-  -- Hardware multiplier extensions --
-  assert not ((CPU_EXTENSION_RISCV_Zmmul = true) and (CPU_EXTENSION_RISCV_M = true)) report
-    "NEORV32 CPU CONFIG ERROR! <M> and <Zmmul> extensions cannot co-exist!" severity error;
-
-  -- Debug mode --
-  assert not ((CPU_EXTENSION_RISCV_Sdext = true) and (CPU_EXTENSION_RISCV_Zifencei = false)) report
-    "NEORV32 CPU CONFIG ERROR! Debug mode requires <CPU_EXTENSION_RISCV_Zifencei> extension to be enabled." severity error;
+    "[NEORV32] Assuming this is a simulation." severity warning;
 
 
   -- Control Unit ---------------------------------------------------------------------------
@@ -196,31 +188,31 @@ begin
   neorv32_cpu_control_inst: entity neorv32.neorv32_cpu_control
   generic map (
     -- General --
-    HART_ID                      => HART_ID,                      -- hardware thread ID
-    VENDOR_ID                    => VENDOR_ID,                    -- vendor's JEDEC ID
-    CPU_BOOT_ADDR                => CPU_BOOT_ADDR,                -- cpu boot address
-    CPU_DEBUG_PARK_ADDR          => CPU_DEBUG_PARK_ADDR,          -- cpu debug mode parking loop entry address
-    CPU_DEBUG_EXC_ADDR           => CPU_DEBUG_EXC_ADDR,           -- cpu debug mode exception entry address
+    HART_ID                    => HART_ID,                      -- hardware thread ID
+    VENDOR_ID                  => VENDOR_ID,                    -- vendor's JEDEC ID
+    CPU_BOOT_ADDR              => CPU_BOOT_ADDR,                -- cpu boot address
+    CPU_DEBUG_PARK_ADDR        => CPU_DEBUG_PARK_ADDR,          -- cpu debug mode parking loop entry address
+    CPU_DEBUG_EXC_ADDR         => CPU_DEBUG_EXC_ADDR,           -- cpu debug mode exception entry address
     -- RISC-V CPU Extensions --
-    CPU_EXTENSION_RISCV_A        => CPU_EXTENSION_RISCV_A,        -- implement atomic memory operations extension?
-    CPU_EXTENSION_RISCV_B        => CPU_EXTENSION_RISCV_B,        -- implement bit-manipulation extension?
-    CPU_EXTENSION_RISCV_C        => CPU_EXTENSION_RISCV_C,        -- implement compressed extension?
-    CPU_EXTENSION_RISCV_E        => CPU_EXTENSION_RISCV_E,        -- implement embedded RF extension?
-    CPU_EXTENSION_RISCV_M        => CPU_EXTENSION_RISCV_M,        -- implement mul/div extension?
-    CPU_EXTENSION_RISCV_U        => CPU_EXTENSION_RISCV_U,        -- implement user mode extension?
-    CPU_EXTENSION_RISCV_Zfinx    => CPU_EXTENSION_RISCV_Zfinx,    -- implement 32-bit floating-point extension (using INT reg!)
-    CPU_EXTENSION_RISCV_Zicntr   => CPU_EXTENSION_RISCV_Zicntr,   -- implement base counters?
-    CPU_EXTENSION_RISCV_Zihpm    => CPU_EXTENSION_RISCV_Zihpm,    -- implement hardware performance monitors?
-    CPU_EXTENSION_RISCV_Zifencei => CPU_EXTENSION_RISCV_Zifencei, -- implement instruction stream sync.?
-    CPU_EXTENSION_RISCV_Zmmul    => CPU_EXTENSION_RISCV_Zmmul,    -- implement multiply-only M sub-extension?
-    CPU_EXTENSION_RISCV_Zxcfu    => CPU_EXTENSION_RISCV_Zxcfu,    -- implement custom (instr.) functions unit?
-    CPU_EXTENSION_RISCV_Sdext    => CPU_EXTENSION_RISCV_Sdext,    -- implement external debug mode extension?
-    CPU_EXTENSION_RISCV_Sdtrig   => CPU_EXTENSION_RISCV_Sdtrig,   -- implement trigger module extension?
+    CPU_EXTENSION_RISCV_A      => CPU_EXTENSION_RISCV_A,        -- implement atomic memory operations extension?
+    CPU_EXTENSION_RISCV_B      => CPU_EXTENSION_RISCV_B,        -- implement bit-manipulation extension?
+    CPU_EXTENSION_RISCV_C      => CPU_EXTENSION_RISCV_C,        -- implement compressed extension?
+    CPU_EXTENSION_RISCV_E      => CPU_EXTENSION_RISCV_E,        -- implement embedded RF extension?
+    CPU_EXTENSION_RISCV_M      => CPU_EXTENSION_RISCV_M,        -- implement mul/div extension?
+    CPU_EXTENSION_RISCV_U      => CPU_EXTENSION_RISCV_U,        -- implement user mode extension?
+    CPU_EXTENSION_RISCV_Zfinx  => CPU_EXTENSION_RISCV_Zfinx,    -- implement 32-bit floating-point extension (using INT reg!)
+    CPU_EXTENSION_RISCV_Zicntr => CPU_EXTENSION_RISCV_Zicntr,   -- implement base counters?
+    CPU_EXTENSION_RISCV_Zihpm  => CPU_EXTENSION_RISCV_Zihpm,    -- implement hardware performance monitors?
+    CPU_EXTENSION_RISCV_Zmmul  => CPU_EXTENSION_RISCV_Zmmul,    -- implement multiply-only M sub-extension?
+    CPU_EXTENSION_RISCV_Zxcfu  => CPU_EXTENSION_RISCV_Zxcfu,    -- implement custom (instr.) functions unit?
+    CPU_EXTENSION_RISCV_Sdext  => CPU_EXTENSION_RISCV_Sdext,    -- implement external debug mode extension?
+    CPU_EXTENSION_RISCV_Sdtrig => CPU_EXTENSION_RISCV_Sdtrig,   -- implement trigger module extension?
     -- Tuning Options --
-    FAST_MUL_EN                  => FAST_MUL_EN,                  -- use DSPs for M extension's multiplier
-    FAST_SHIFT_EN                => FAST_SHIFT_EN,                -- use barrel shifter for shift operations
+    FAST_MUL_EN                => FAST_MUL_EN,                  -- use DSPs for M extension's multiplier
+    FAST_SHIFT_EN              => FAST_SHIFT_EN,                -- use barrel shifter for shift operations
+    REGFILE_HW_RST             => REGFILE_HW_RST,               -- implement full hardware reset for register file
     -- Physical memory protection (PMP) --
-    PMP_EN                       => pmp_enable_c,                 -- physical memory protection enabled
+    PMP_EN                     => pmp_enable_c,                 -- physical memory protection enabled
     -- Hardware Performance Monitors (HPM) --
     HPM_NUM_CNTS                 => HPM_NUM_CNTS,                 -- number of implemented HPM counters (0..13)
     HPM_CNT_WIDTH                => HPM_CNT_WIDTH,                -- total size of HPM counters
@@ -247,7 +239,7 @@ begin
     imm_o         => imm,            -- immediate
     fetch_pc_o    => fetch_pc,       -- instruction fetch address
     curr_pc_o     => curr_pc,        -- current PC (corresponding to current instruction)
-    next_pc_o     => next_pc,        -- next PC (corresponding to next instruction)
+    link_pc_o     => link_pc,        -- link PC (return address)
     csr_rdata_o   => csr_rdata,      -- CSR read data
     -- external CSR interface --
     xcsr_we_o     => xcsr_we,        -- global write enable
@@ -294,19 +286,21 @@ begin
   -- -------------------------------------------------------------------------------------------
   neorv32_cpu_regfile_inst: entity neorv32.neorv32_cpu_regfile
   generic map (
-    RVE    => CPU_EXTENSION_RISCV_E, -- implement embedded RF extension?
+    RST_EN => REGFILE_HW_RST,        -- enable dedicated hardware reset ("ASIC style")
+    RVE_EN => CPU_EXTENSION_RISCV_E, -- implement embedded RF extension
     RS3_EN => regfile_rs3_en_c,      -- enable 3rd read port
     RS4_EN => regfile_rs4_en_c       -- enable 4th read port
   )
   port map (
     -- global control --
     clk_i  => clk_i,     -- global clock, rising edge
+    rstn_i => rstn_i,    -- global reset, low-active, async
     ctrl_i => ctrl,      -- main control bus
     -- data input --
     alu_i  => alu_res,   -- ALU result
     mem_i  => mem_rdata, -- memory read data
     csr_i  => csr_rdata, -- CSR read data
-    pc2_i  => next_pc,   -- next PC
+    ret_i  => link_pc,   -- return address
     -- data output --
     rs1_o  => rs1,       -- rs1
     rs2_o  => rs2,       -- rs2
@@ -416,8 +410,8 @@ begin
   pmp_inst_false:
   if (pmp_enable_c = false) generate
     xcsr_rdata_pmp <= (others => '0');
-    pmp_ex_fault <= '0';
-    pmp_rw_fault <= '0';
+    pmp_ex_fault   <= '0';
+    pmp_rw_fault   <= '0';
   end generate;
 
 

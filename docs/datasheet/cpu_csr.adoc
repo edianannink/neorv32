@@ -39,6 +39,9 @@ bits can actually be modified.
 | 0x343 | <<_mtval>>    | `CSR_MTVAL`    | MRW | Machine trap value
 | 0x344 | <<_mip>>      | `CSR_MIP`      | MRW | Machine interrupt pending register
 | 0x34a | <<_mtinst>>   | `CSR_MTINST`   | MRW | Machine trap instruction
+5+^| **<<_machine_configuration_csrs>>**
+| 0x30a | <<_menvcfg>>  | `CSR_MENVCFG`  | MRW | Machine environment configuration register - low word
+| 0x31a | <<_menvcfgh>> | `CSR_MENVCFGH` | MRW | Machine environment configuration register - high word
 5+^| **<<_machine_physical_memory_protection_csrs>>**
 | 0x3a0 .. 0x303 | <<_pmpcfg, `pmpcfg0`>> .. <<_pmpcfg, `pmpcfg3`>>      | `CSR_PMPCFG0` .. `CSR_PMPCFG3`    | MRW | Physical memory protection configuration registers
 | 0x3b0 .. 0x3bf | <<_pmpaddr, `pmpaddr0`>> .. <<_pmpaddr, `pmpaddr15`>> | `CSR_PMPADDR0` .. `CSR_PMPADDR15` | MRW | Physical memory protection address registers
@@ -46,11 +49,7 @@ bits can actually be modified.
 | 0x7a0 | <<_tselect>>  | `CSR_TSELECT`  | MRW | Trigger select register
 | 0x7a1 | <<_tdata1>>   | `CSR_TDATA1`   | MRW | Trigger data register 1
 | 0x7a2 | <<_tdata2>>   | `CSR_TDATA2`   | MRW | Trigger data register 2
-| 0x7a3 | <<_tdata3>>   | `CSR_TDATA3`   | MRW | Trigger data register 3
 | 0x7a4 | <<_tinfo>>    | `CSR_TINFO`    | MRW | Trigger information register
-| 0x7a5 | <<_tcontrol>> | `CSR_TCONTROL` | MRW | Trigger control register
-| 0x7a8 | <<_mcontext>> | `CSR_MCONTEXT` | MRW | Machine context register
-| 0x7aa | <<_scontext>> | `CSR_SCONTEXT` | MRW | Supervisor context register
 5+^| **<<_cpu_debug_mode_csrs>>**
 | 0x7b0 | <<_dcsr>>      | - | DRW | Debug control and status register
 | 0x7b1 | <<_dpc>>       | - | DRW | Debug program counter
@@ -373,7 +372,11 @@ or entirely denied allowing access to **none** counter CSRs.
 | ISA         | `Zicsr`
 | Description | The `mepc` CSR provides the instruction address where execution has stopped/failed when
 an instruction is triggered / an exception is raised. See section <<_traps_exceptions_and_interrupts>> for a list of all legal values.
+The `mret` instruction will return to the address stored in `mepc` by automatically moving `mepc` to the program counter.
 |=======================
+
+[NOTE]
+`mepc[0]` is hardwired to zero. If IALIGN = 32 (i.e. <<_c_isa_extension>> is disabled) then `mepc[1]` is also hardwired to zero.
 
 
 {empty} +
@@ -480,6 +483,42 @@ The RISC-V priv. spec. suggests that the instruction word written to `mtinst` by
 However, the NEORV32 `mtinst` CSR uses a simplified transformation scheme: if the trap-causing instruction is a
 standard 32-bit instruction, `mtinst` contains the exact instruction word that caused the trap. If the trap-causing
 instruction is a compressed instruction, `mtinst` contains the de-compressed 32-bit equivalent with bit 1 being cleared.
+
+
+
+<<<
+// ####################################################################################################################
+:sectnums:
+==== Machine Configuration CSRs
+
+[discrete]
+===== **`menvcfg`**
+
+[cols="<1,<8"]
+[frame="topbot",grid="none"]
+|=======================
+| Name        | Machine environment configuration register - low word
+| Address     | `0x30a`
+| Reset value | `0x00000000`
+| ISA         | `Zicsr` & `U`
+| Description | Currently, the features of this CSR are not supported. Hence, the entire register is hardwired to all-zero.
+|=======================
+
+
+{empty} +
+[discrete]
+===== **`menvcfgh`**
+
+[cols="<1,<8"]
+[frame="topbot",grid="none"]
+|=======================
+| Name        | Machine environment configuration register - high word
+| Address     | `0x31a`
+| Reset value | `0x00000000`
+| ISA         | `Zicsr` & `U`
+| Description | Currently, the features of this CSR are not supported. Hence, the entire register is hardwired to all-zero.
+|=======================
+
 
 
 <<<
@@ -1001,7 +1040,8 @@ discover ISA sub-extensions and CPU configuration options
 | 11    | `CSR_MXISA_SDTRIG`    | r/- | <<_sdtrig_isa_extension>> available
 | 19:12 | -                     | r/- | hardwired to zero
 | 20    | `CSR_MXISA_IS_SIM`    | r/- | set if CPU is being **simulated** (⚠️ not guaranteed)
-| 31:21 | -                     | r/- | hardwired to zero
+| 28:21 | -                     | r/- | hardwired to zero
+| 29    | `CSR_MXISA_RFHWRST`   | r/- | full hardware reset of register file available when set (`REGFILE_HW_RST`)
 | 30    | `CSR_MXISA_FASTMUL`   | r/- | fast multiplication available when set (`FAST_MUL_EN`)
 | 31    | `CSR_MXISA_FASTSHIFT` | r/- | fast shifts available when set (`FAST_SHIFT_EN`)
 |=======================
