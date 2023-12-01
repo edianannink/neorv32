@@ -209,13 +209,12 @@ begin
     CPU_EXTENSION_RISCV_Zfinx    => false,          -- implement 32-bit floating-point extension (using INT reg!)
     CPU_EXTENSION_RISCV_Zicntr   => true,           -- implement base counters?
     CPU_EXTENSION_RISCV_Zihpm    => true,           -- implement hardware performance monitors?
-    CPU_EXTENSION_RISCV_Zifencei => true,          -- implement instruction stream sync.?
     CPU_EXTENSION_RISCV_Zmmul    => false,          -- implement multiply-only M sub-extension?
     CPU_EXTENSION_RISCV_Zxcfu    => false,          -- implement custom (instr.) functions unit?
     -- Extension Options --
     FAST_MUL_EN                  => false,         -- use DSPs for M extension's multiplier
     FAST_SHIFT_EN                => false,         -- use barrel shifter for shift operations
-    REGFILE_HW_RST               => true,          -- full hardware reset
+    REGFILE_HW_RST               => false,          -- full hardware reset
     -- Physical Memory Protection (PMP) --
     PMP_NUM_REGIONS              => 5,              -- number of regions (0..16)
     PMP_MIN_GRANULARITY          => 4,              -- minimal region granularity in bytes, has to be a power of 2, min 4 bytes

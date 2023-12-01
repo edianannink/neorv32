@@ -175,7 +175,10 @@ begin
   -- -------------------------------------------------------------------------------------------
   bus_feedback: process(clk_i)
   begin
-    if rising_edge(clk_i) then
+    if (rstn_i = '0') then
+      rden          <= '0';
+      bus_rsp_o.ack <= '0';
+    elsif rising_edge(clk_i) then
       rden <= bus_req_i.stb and (not bus_req_i.rw);
       if (IMEM_AS_IROM = true) then
         bus_rsp_o.ack <= bus_req_i.stb and (not bus_req_i.rw); -- read-only!
@@ -197,8 +200,10 @@ begin
   bus_req_o.src   <= '1'; -- source = instruction fetch
   bus_req_o.rvso  <= '0'; -- cannot be a reservation set operation
 
-  bus_rsp_o.data <= b2_ecc_dec_o & b1_ecc_dec_o & b0_ecc_dec_o when (rden = '1') else (others => '0');
-	fetched_o <= fetched;
+  bus_rsp_o.data <= b2_ecc_dec_o & b1_ecc_dec_o & b0_ecc_dec_o when (rden = '1') else (others => '0'); -- output gate
+  bus_rsp_o.err  <= '0'; -- no access error possible
+
+  fetched_o <= fetched;
 
   ecc_error_o(0) <= (b0_ecc_err_o(0) or b1_ecc_err_o(0) or b2_ecc_err_o(0)) when (rden = '1') else '0';
   ecc_error_o(1) <= (b0_ecc_err_o(1) or b1_ecc_err_o(1) or b2_ecc_err_o(1)) when (rden = '1') else '0';

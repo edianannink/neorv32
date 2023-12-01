@@ -114,28 +114,6 @@ architecture neorv32_cpu_regfile_rtl of neorv32_cpu_regfile is
   );
   end component;
 
-  -- ECC signals --
-  signal ecc_enc_out : std_ulogic_vector(38 downto 0);
-  signal ecc_dec_opa_out, ecc_dec_opb_out, ecc_dec_opc_out, ecc_dec_opd_out: std_ulogic_vector(31 downto 0);
-  signal ecc_dec_opa_err_out, ecc_dec_opb_err_out: std_ulogic_vector(1 downto 0);
-  signal ecc_error: std_ulogic_vector(1 downto 0);
-  
-  component prim_secded_39_32_enc
-  port (
-    data_i : in std_ulogic_vector(31 downto 0);
-    data_o : out std_ulogic_vector(38 downto 0)
-  );
-  end component;
-
-  component prim_secded_39_32_dec
-  port (
-    data_i : in std_ulogic_vector(38 downto 0);
-    data_o : out std_ulogic_vector(31 downto 0);
-    syndrome_o : out std_ulogic_vector(6 downto 0);
-    err_o : out std_ulogic_vector(1 downto 0)
-  );
-  end component;
-
 begin
 
   prim_secded_39_32_enc_inst: prim_secded_39_32_enc
@@ -154,7 +132,7 @@ begin
 
   prim_secded_39_32_dec_inst_opb: prim_secded_39_32_dec
     port map (
-      data_i     => reg_file(to_integer(unsigned(opb_addr(addr_bits_c-1 downto 0)))),
+      data_i     => reg_file(to_integer(unsigned(ctrl_i.rf_rs2(addr_bits_c-1 downto 0)))),
       data_o     => ecc_dec_opb_out,
       syndrome_o => open,
       err_o      => ecc_dec_opb_err_out
@@ -162,7 +140,7 @@ begin
 
   prim_secded_39_32_dec_inst_opc: prim_secded_39_32_dec
     port map (
-      data_i     => reg_file(to_integer(unsigned(opc_addr(addr_bits_c-1 downto 0)))),
+      data_i     => reg_file(to_integer(unsigned(ctrl_i.rf_rs3(addr_bits_c-1 downto 0)))),
       data_o     => ecc_dec_opc_out,
       syndrome_o => open,
       err_o      => open
@@ -170,7 +148,7 @@ begin
 
   prim_secded_39_32_dec_inst_opd: prim_secded_39_32_dec
     port map (
-      data_i     => reg_file(to_integer(unsigned(opd_addr(addr_bits_c-1 downto 0)))),
+      data_i     => reg_file(to_integer(unsigned(rs4_addr(addr_bits_c-1 downto 0)))),
       data_o     => ecc_dec_opd_out,
       syndrome_o => open,
       err_o      => open
@@ -215,10 +193,10 @@ begin
     begin
       if rising_edge(clk_i) then
         if (rf_we = '1') then
-          reg_file(to_integer(unsigned(opa_addr(addr_bits_c-1 downto 0)))) <= rf_wdata;
+          reg_file(to_integer(unsigned(opa_addr(addr_bits_c-1 downto 0)))) <= ecc_enc_out;
         end if;
-        rs1_o <= reg_file(to_integer(unsigned(opa_addr(addr_bits_c-1 downto 0))));
-        rs2_o <= reg_file(to_integer(unsigned(ctrl_i.rf_rs2(addr_bits_c-1 downto 0))));
+        rs1_o <= ecc_dec_opa_out;
+        rs2_o <= ecc_dec_opb_out;
       end if;
     end process register_file;
 
@@ -274,7 +252,7 @@ begin
     rs3_read: process(clk_i)
     begin
       if rising_edge(clk_i) then
-        rs3_o <= reg_file(to_integer(unsigned(ctrl_i.rf_rs3(addr_bits_c-1 downto 0))));
+        rs3_o <= ecc_dec_opc_out;
       end if;
     end process rs3_read;
   end generate;
@@ -290,7 +268,7 @@ begin
     rs4_read: process(clk_i)
     begin
       if rising_edge(clk_i) then
-        rs4_o <= reg_file(to_integer(unsigned(rs4_addr(addr_bits_c-1 downto 0))));
+        rs4_o <= ecc_dec_opd_out;
       end if;
     end process rs4_read;
     rs4_addr <= ctrl_i.ir_funct12(6 downto 5) & ctrl_i.ir_funct3; -- rs4: [26:25] & [14:12]; not RISC-V-standard!

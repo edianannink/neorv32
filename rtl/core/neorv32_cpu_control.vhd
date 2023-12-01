@@ -375,7 +375,7 @@ begin
       clk               => clk_i,
       reset             => not rstn_i,
       instr             => bus_rsp_i.data,
-      addr              => fetch_engine.pc & "00",
+      addr              => fetch_engine.pc,
       ack_instr         => bus_rsp_i.ack,
       illegal_instr     => illegal_instr,
       dsp_timeout       => dsp_timeout 
@@ -414,7 +414,7 @@ begin
 
         when IF_RESTART => -- set new fetch start address
         -- ------------------------------------------------------------
-          fetch_engine.pc        <= execute_engine.pc(XLEN-1 downto 2); -- initialize with logical PC, word aligned
+          fetch_engine.pc        <= execute_engine.pc(XLEN-1 downto 2) & "00"; -- initialize with logical PC, word aligned
           fetch_engine.unaligned <= execute_engine.pc(1);
           if imem_fetched_i = '1' then
             fetch_engine.state     <= IF_REQUEST;

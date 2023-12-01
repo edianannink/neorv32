@@ -46,7 +46,6 @@ architecture neorv32_dmem_rtl of neorv32_dmem is
   signal rden  : std_ulogic;
   signal addr  : std_ulogic_vector(index_size_f(DMEM_SIZE/4)-1 downto 0);
 
-<<<<<<< HEAD
   -- -------------------------------------------------------------------------------------------------------------- --
   -- The memory (RAM) is built from 4 individual byte-wide memories b0..b3, since some synthesis tools have         --
   -- problems with 32-bit memories that provide dedicated byte-enable signals AND/OR with multi-dimensional arrays. --
@@ -78,13 +77,6 @@ architecture neorv32_dmem_rtl of neorv32_dmem is
   signal ecc_enc_byte0_out, ecc_enc_byte1_out, ecc_enc_byte2_out, ecc_enc_byte3_out : std_ulogic_vector(12 downto 0);
   signal ecc_error_byte0, ecc_error_byte1, ecc_error_byte2, ecc_error_byte3 : std_ulogic_vector(1 downto 0);
   signal ecc_error: std_ulogic_vector(1 downto 0);
-=======
-  -- The memory (RAM) is built from 4 individual byte-wide memories because some synthesis
-  -- tools have issues inferring 32-bit memories that provide dedicated byte-enable signals
-  -- and/or with multi-dimensional arrays. [NOTE] Read-during-write behavior is irrelevant
-  -- as read and write accesses are mutually exclusive.
-  signal mem_ram_b0, mem_ram_b1, mem_ram_b2, mem_ram_b3 : mem8_t(0 to DMEM_SIZE/4-1);
->>>>>>> origin/main
 
 begin
 
@@ -107,10 +99,10 @@ begin
           mem_ram_b3(to_integer(unsigned(addr))) <= ecc_enc_byte3_out;
         end if;
       end if;
-      rdata(07 downto 00) <= mem_ram_b0(to_integer(unsigned(addr)));
-      rdata(15 downto 08) <= mem_ram_b1(to_integer(unsigned(addr)));
-      rdata(23 downto 16) <= mem_ram_b2(to_integer(unsigned(addr)));
-      rdata(31 downto 24) <= mem_ram_b3(to_integer(unsigned(addr)));
+      mem_ram_b0_rd <= mem_ram_b0(to_integer(unsigned(addr)));
+      mem_ram_b1_rd <= mem_ram_b1(to_integer(unsigned(addr)));
+      mem_ram_b2_rd <= mem_ram_b2(to_integer(unsigned(addr)));
+      mem_ram_b3_rd <= mem_ram_b3(to_integer(unsigned(addr)));
     end if;
   end process mem_access;
 
@@ -131,16 +123,8 @@ begin
     end if;
   end process bus_feedback;
 
-<<<<<<< HEAD
-  -- output gate --
-  bus_rsp_o.data <= rdata when (rden = '1') else (others => '0');
-
-  -- no access error possible --
-  bus_rsp_o.err <= '0';
-=======
   bus_rsp_o.data <= rdata when (rden = '1') else (others => '0'); -- output gate
   bus_rsp_o.err  <= '0'; -- no access error possible
->>>>>>> origin/main
 
   -- ECC --------------------------------------------------------------------------------------
   prim_secded_13_8_enc_inst_byte0 : prim_secded_13_8_enc
