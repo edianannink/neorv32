@@ -69,7 +69,9 @@ entity neorv32_cpu_regfile is
     rs1_o  : out std_ulogic_vector(XLEN-1 downto 0); -- rs1
     rs2_o  : out std_ulogic_vector(XLEN-1 downto 0); -- rs2
     rs3_o  : out std_ulogic_vector(XLEN-1 downto 0); -- rs3
-    rs4_o  : out std_ulogic_vector(XLEN-1 downto 0)  -- rs4
+    rs4_o  : out std_ulogic_vector(XLEN-1 downto 0); -- rs4
+    -- ECC error --
+    ecc_error_o : out std_ulogic_vector(1 downto 0)
   );
 end neorv32_cpu_regfile;
 

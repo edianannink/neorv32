@@ -70,7 +70,9 @@ entity neorv32_cpu is
     PMP_MIN_GRANULARITY          : natural; -- minimal region granularity in bytes, has to be a power of 2, min 4 bytes
     -- Hardware Performance Monitors (HPM) --
     HPM_NUM_CNTS                 : natural range 0 to 13; -- number of implemented HPM counters (0..13)
-    HPM_CNT_WIDTH                : natural range 0 to 64  -- total size of HPM counters (0..64)
+    HPM_CNT_WIDTH                : natural range 0 to 64; -- total size of HPM counters (0..64)
+    -- Instruction Validator --
+    MEM_INT_IV_EN                : boolean
   );
   port (
     -- global control --
@@ -91,7 +93,14 @@ entity neorv32_cpu is
     ibus_rsp_i : in  bus_rsp_t; -- response bus
     -- data bus interface --
     dbus_req_o : out bus_req_t; -- request bus
-    dbus_rsp_i : in  bus_rsp_t  -- response bus
+    dbus_rsp_i : in  bus_rsp_t; -- response bus
+    -- ecc --
+    ecc_error_dmem_i : in std_ulogic_vector(1 downto 0);
+    ecc_error_imem_i : in std_ulogic_vector(1 downto 0);
+    -- instruction validator --
+    illegal_instr: out std_ulogic;
+    -- imem fetched --
+    imem_fetched_i: in std_ulogic
   );
 end neorv32_cpu;
 
@@ -134,6 +143,7 @@ architecture neorv32_cpu_rtl of neorv32_cpu is
   signal link_pc      : std_ulogic_vector(XLEN-1 downto 0); -- link pc (return address)
   signal pmp_ex_fault : std_ulogic; -- PMP instruction fetch fault
   signal pmp_rw_fault : std_ulogic; -- PMP read/write access fault
+  signal ecc_regfile_error : std_ulogic_vector(1 downto 0); -- ECC error in CPU register file
 
 begin
 
@@ -205,7 +215,9 @@ begin
     PMP_EN                     => pmp_enable_c,                 -- physical memory protection enabled
     -- Hardware Performance Monitors (HPM) --
     HPM_NUM_CNTS               => HPM_NUM_CNTS,                 -- number of implemented HPM counters (0..13)
-    HPM_CNT_WIDTH              => HPM_CNT_WIDTH                 -- total size of HPM counters
+    HPM_CNT_WIDTH              => HPM_CNT_WIDTH,                -- total size of HPM counters
+    -- Instruction Validator --
+    MEM_INT_IV_EN              => MEM_INT_IV_EN
   )
   port map (
     -- global control --
@@ -247,7 +259,15 @@ begin
     ma_load_i     => ma_load,        -- misaligned load data address
     ma_store_i    => ma_store,       -- misaligned store data address
     be_load_i     => be_load,        -- bus error on load data access
-    be_store_i    => be_store        -- bus error on store data access
+    be_store_i    => be_store,       -- bus error on store data access
+    -- ecc errors --
+    ecc_error_regfile_i => ecc_regfile_error,
+    ecc_error_dmem_i => ecc_error_dmem_i,
+    ecc_error_imem_i => ecc_error_imem_i,
+    -- instruction validator --
+    illegal_instr_o => illegal_instr,
+    -- imem fetched --
+    imem_fetched_i => imem_fetched_i
   );
 
   -- external CSR read-back --
@@ -285,7 +305,9 @@ begin
     rs1_o  => rs1,       -- rs1
     rs2_o  => rs2,       -- rs2
     rs3_o  => rs3,       -- rs3
-    rs4_o  => rs4        -- rs4
+    rs4_o  => rs4,       -- rs4
+    -- ECC error --
+    ecc_error_o => ecc_regfile_error
   );
 
 

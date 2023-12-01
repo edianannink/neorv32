@@ -69,7 +69,7 @@ architecture neorv32_tb_rtl of neorv32_tb is
   -- general --
   constant int_imem_c              : boolean := false; -- true: use proc-internal IMEM, false: use external simulated IMEM (ext. mem A)
   constant int_dmem_c              : boolean := false; -- true: use proc-internal DMEM, false: use external simulated DMEM (ext. mem B)
-  constant imem_size_c             : natural := 32*1024; -- size in bytes of processor-internal IMEM / external mem A
+  constant imem_size_c             : natural := 16*1024; -- size in bytes of processor-internal IMEM / external mem A
   constant dmem_size_c             : natural := 8*1024; -- size in bytes of processor-internal DMEM / external mem B
   constant f_clock_c               : natural := 100000000; -- main clock in Hz
   constant baud0_rate_c            : natural := 19200; -- simulation UART0 (primary UART) baud rate
@@ -77,8 +77,8 @@ architecture neorv32_tb_rtl of neorv32_tb is
   constant icache_en_c             : boolean := false; -- implement i-cache
   constant icache_block_size_c     : natural := 64; -- i-cache block size in bytes
   -- simulated external Wishbone memory A (can be used as external IMEM) --
-  constant ext_mem_a_base_addr_c   : std_ulogic_vector(31 downto 0) := x"00000000"; -- wishbone memory base address (external IMEM base)
-  constant ext_mem_a_size_c        : natural := imem_size_c; -- wishbone memory size in bytes
+  constant ext_mem_a_base_addr_c   : std_ulogic_vector(31 downto 0) := x"00004000"; -- wishbone memory base address (external IMEM base)
+  constant ext_mem_a_size_c        : natural := 250*1024; -- wishbone memory size in bytes
   constant ext_mem_a_latency_c     : natural := 8; -- latency in clock cycles (min 1, max 255), plus 1 cycle initial delay
   -- simulated external Wishbone memory B (can be used as external DMEM) --
   constant ext_mem_b_base_addr_c   : std_ulogic_vector(31 downto 0) := x"80000000"; -- wishbone memory base address (external DMEM base)
@@ -223,23 +223,23 @@ begin
     VENDOR_ID                    => x"00000000",   -- vendor's JEDEC ID
     INT_BOOTLOADER_EN            => false,         -- boot configuration: true = boot explicit bootloader; false = boot from int/ext (I)MEM
     -- On-Chip Debugger (OCD) --
-    ON_CHIP_DEBUGGER_EN          => true,          -- implement on-chip debugger
+    ON_CHIP_DEBUGGER_EN          => false,          -- implement on-chip debugger
     -- RISC-V CPU Extensions --
     CPU_EXTENSION_RISCV_A        => true,          -- implement atomic memory operations extension?
-    CPU_EXTENSION_RISCV_B        => true,          -- implement bit-manipulation extension?
+    CPU_EXTENSION_RISCV_B        => false,          -- implement bit-manipulation extension?
     CPU_EXTENSION_RISCV_C        => true,          -- implement compressed extension?
     CPU_EXTENSION_RISCV_E        => false,         -- implement embedded RF extension?
     CPU_EXTENSION_RISCV_M        => true,          -- implement mul/div extension?
-    CPU_EXTENSION_RISCV_U        => true,          -- implement user mode extension?
-    CPU_EXTENSION_RISCV_Zfinx    => true,          -- implement 32-bit floating-point extension (using INT reg!)
+    CPU_EXTENSION_RISCV_U        => false,          -- implement user mode extension?
+    CPU_EXTENSION_RISCV_Zfinx    => false,          -- implement 32-bit floating-point extension (using INT reg!)
     CPU_EXTENSION_RISCV_Zicntr   => true,          -- implement base counters?
     CPU_EXTENSION_RISCV_Zihpm    => true,          -- implement hardware performance monitors?
     CPU_EXTENSION_RISCV_Zmmul    => false,         -- implement multiply-only M sub-extension?
-    CPU_EXTENSION_RISCV_Zxcfu    => true,          -- implement custom (instr.) functions unit?
+    CPU_EXTENSION_RISCV_Zxcfu    => false,          -- implement custom (instr.) functions unit?
     -- Extension Options --
     FAST_MUL_EN                  => false,         -- use DSPs for M extension's multiplier
     FAST_SHIFT_EN                => false,         -- use barrel shifter for shift operations
-    REGFILE_HW_RST               => true,          -- full hardware reset
+    REGFILE_HW_RST               => false,         -- full hardware reset
     -- Physical Memory Protection (PMP) --
     PMP_NUM_REGIONS              => 5,             -- number of regions (0..16)
     PMP_MIN_GRANULARITY          => 4,             -- minimal region granularity in bytes, has to be a power of 2, min 4 bytes
@@ -249,10 +249,13 @@ begin
     -- Atomic Memory Access - Reservation Set Granularity --
     AMO_RVS_GRANULARITY          => 4,             -- size in bytes, has to be a power of 2, min 4
     -- Internal Instruction memory --
-    MEM_INT_IMEM_EN              => int_imem_c ,   -- implement processor-internal instruction memory
+    MEM_INT_IMEM_EN              => true ,   -- implement processor-internal instruction memory
     MEM_INT_IMEM_SIZE            => imem_size_c,   -- size of processor-internal instruction memory in bytes
+    MEM_INT_IMEM_PREFETCH        => true,
+    MEM_INT_PREFETCH_BASE        => x"00004000",
+    MEM_INT_IV_EN                => true,
     -- Internal Data memory --
-    MEM_INT_DMEM_EN              => int_dmem_c,    -- implement processor-internal data memory
+    MEM_INT_DMEM_EN              => true,    -- implement processor-internal data memory
     MEM_INT_DMEM_SIZE            => dmem_size_c,   -- size of processor-internal data memory in bytes
     -- Internal Cache memory --
     ICACHE_EN                    => false,         -- implement instruction cache
@@ -468,7 +471,7 @@ begin
   generate_ext_imem:
   if (int_imem_c = false) generate
     ext_mem_a_access: process(clk_gen)
-      variable ext_ram_a : mem32_t(0 to ext_mem_a_size_c/4-1) := mem32_init_f(application_init_image, ext_mem_a_size_c/4); -- initialized, used to simulate external IMEM
+      variable ext_ram_a : mem32_t(to_integer(unsigned(ext_mem_a_base_addr_c))/4 to ext_mem_a_size_c/4-1) := mem32_init_f(application_init_image, ext_mem_a_size_c/4-to_integer(unsigned(ext_mem_a_base_addr_c))/4); -- initialized, used to simulate external IMEM
     begin
       if rising_edge(clk_gen) then
         -- control --
@@ -484,7 +487,9 @@ begin
         end if;
 
         -- read access --
-        ext_mem_a.rdata(0) <= ext_ram_a(to_integer(unsigned(wb_mem_a.addr(index_size_f(ext_mem_a_size_c/4)+1 downto 2)))); -- word aligned
+        if to_integer(unsigned(wb_mem_a.addr)) >= to_integer(unsigned(ext_mem_a_base_addr_c)) then
+          ext_mem_a.rdata(0) <= ext_ram_a(to_integer(unsigned(wb_mem_a.addr(index_size_f(ext_mem_a_size_c/4)+1 downto 2)))); -- word aligned
+        end if;
         -- virtual read and ack latency --
         if (ext_mem_a_latency_c > 1) then
           for i in 1 to ext_mem_a_latency_c-1 loop
@@ -505,6 +510,7 @@ begin
       end if;
     end process ext_mem_a_access;
   end generate;
+
 
   generate_ext_imem_false:
   if (int_imem_c = true) generate

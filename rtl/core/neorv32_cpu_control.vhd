@@ -80,7 +80,9 @@ entity neorv32_cpu_control is
     PMP_EN                     : boolean; -- physical memory protection enabled
     -- Hardware Performance Monitors (HPM) --
     HPM_NUM_CNTS               : natural range 0 to 13; -- number of implemented HPM counters (0..13)
-    HPM_CNT_WIDTH              : natural range 0 to 64  -- total size of HPM counters (0..64)
+    HPM_CNT_WIDTH              : natural range 0 to 64; -- total size of HPM counters (0..64)
+    -- Instruction Validator --
+    MEM_INT_IV_EN              : boolean
   );
   port (
     -- global control --
@@ -120,7 +122,15 @@ entity neorv32_cpu_control is
     ma_load_i     : in  std_ulogic; -- misaligned load data address
     ma_store_i    : in  std_ulogic; -- misaligned store data address
     be_load_i     : in  std_ulogic; -- bus error on load data access
-    be_store_i    : in  std_ulogic  -- bus error on store data access
+    be_store_i    : in  std_ulogic; -- bus error on store data access
+    -- ecc --
+    ecc_error_regfile_i: in std_ulogic_vector(1 downto 0);
+    ecc_error_dmem_i: in std_ulogic_vector(1 downto 0);
+    ecc_error_imem_i: in std_ulogic_vector(1 downto 0);
+    -- instruction validator --
+    illegal_instr_o: out std_ulogic;
+    -- imem fetched --
+    imem_fetched_i: in std_ulogic
   );
 end neorv32_cpu_control;
 
@@ -350,7 +360,29 @@ architecture neorv32_cpu_control_rtl of neorv32_cpu_control is
   -- CSR read-back helpers --
   signal csr_rdata, xcsr_rdata : std_ulogic_vector(XLEN-1 downto 0);
 
+  -- Instruction validator --
+  signal illegal_instr  : std_ulogic := '0';
+  signal dsp_timeout    : std_ulogic;
+
 begin
+
+-- Instruction Validator ------------------------------------------------------------------
+  -- -------------------------------------------------------------------------------------------
+  instruction_validator_inst_true:
+  if (MEM_INT_IV_EN = true) generate
+  instruction_validator_inst: entity neorv32.instruction_validator
+    port map (
+      clk               => clk_i,
+      reset             => not rstn_i,
+      instr             => bus_rsp_i.data,
+      addr              => fetch_engine.pc,
+      ack_instr         => bus_rsp_i.ack,
+      illegal_instr     => illegal_instr,
+      dsp_timeout       => dsp_timeout 
+    );
+  end generate;
+
+  illegal_instr_o <= illegal_instr;
 
 -- ****************************************************************************************************************************
 -- Instruction Fetch (always fetch 32-bit-aligned 32-bit chunks of data)
@@ -384,7 +416,9 @@ begin
         -- ------------------------------------------------------------
           fetch_engine.pc        <= execute_engine.next_pc(XLEN-1 downto 2) & "00"; -- initialize with logical PC, word aligned
           fetch_engine.unaligned <= execute_engine.next_pc(1);
-          fetch_engine.state     <= IF_REQUEST;
+          if imem_fetched_i = '1' then
+            fetch_engine.state     <= IF_REQUEST;
+          end if;
 
         when IF_REQUEST => -- request new 32-bit-aligned instruction word
         -- ------------------------------------------------------------
@@ -2319,23 +2353,35 @@ begin
   cnt_event(hpmcnt_event_tm_c) <= '0'; -- unused/reserved (time)
 
   -- NEORV32-specific counter events (for HPM counters only) --
-  cnt_event(hpmcnt_event_cir_c)     <= '1' when (execute_engine.state = EXECUTE)    and (execute_engine.is_ci      = '1')        else '0'; -- executed compressed instruction
-  cnt_event(hpmcnt_event_wait_if_c) <= '1' when (fetch_engine.state   = IF_PENDING) and (fetch_engine.state_prev   = IF_PENDING) else '0'; -- instruction fetch memory wait cycle
-  cnt_event(hpmcnt_event_wait_ii_c) <= '1' when (execute_engine.state = DISPATCH)   and (execute_engine.state_prev = DISPATCH)   else '0'; -- instruction issue wait cycle
-  cnt_event(hpmcnt_event_wait_mc_c) <= '1' when (execute_engine.state = ALU_WAIT)                                                else '0'; -- multi-cycle alu-operation wait cycle
+  --cnt_event(hpmcnt_event_cir_c)     <= '1' when (execute_engine.state = EXECUTE)    and (execute_engine.is_ci      = '1')        else '0'; -- executed compressed instruction
+  cnt_event(hpmcnt_event_ecc_se_dmem) <= '1' when (ecc_error_dmem_i(0) = '1') else '0';
 
-  cnt_event(hpmcnt_event_load_c)    <= '1' when (ctrl.lsu_req = '1') and (ctrl.lsu_rw = '0')                                  else '0'; -- load operation
-  cnt_event(hpmcnt_event_store_c)   <= '1' when (ctrl.lsu_req = '1') and (ctrl.lsu_rw = '1')                                  else '0'; -- store operation
-  cnt_event(hpmcnt_event_wait_ls_c) <= '1' when (execute_engine.state = MEM_WAIT) and (execute_engine.state_prev2 = MEM_WAIT) else '0'; -- load/store memory wait cycle
+  --cnt_event(hpmcnt_event_wait_if_c) <= '1' when (fetch_engine.state   = IF_PENDING) and (fetch_engine.state_prev   = IF_PENDING) else '0'; -- instruction fetch memory wait cycle
+  cnt_event(hpmcnt_event_ecc_de_dmem) <= '1' when (ecc_error_dmem_i(1) = '1') else '0';
+
+  --cnt_event(hpmcnt_event_wait_ii_c) <= '1' when (execute_engine.state = DISPATCH)   and (execute_engine.state_prev = DISPATCH)   else '0'; -- instruction issue wait cycle
+  cnt_event(hpmcnt_event_ecc_se_regfile) <= '1' when (ecc_error_regfile_i(0) = '1') else '0';
+  
+  --cnt_event(hpmcnt_event_wait_mc_c) <= '1' when (execute_engine.state = ALU_WAIT)                                                else '0'; -- multi-cycle alu-operation wait cycle
+  cnt_event(hpmcnt_event_ecc_de_regfile) <= '1' when (ecc_error_regfile_i(1) = '1') else '0';
+
+  --cnt_event(hpmcnt_event_load_c)    <= '1' when (ctrl.lsu_req = '1') and (ctrl.lsu_rw = '0')                                  else '0'; -- load operation
+  cnt_event(hpmcnt_event_iv) <= '1' when (illegal_instr = '1' and bus_rsp_i.ack = '1') else '0';
+  
+  --cnt_event(hpmcnt_event_store_c)   <= '1' when (ctrl.lsu_req = '1') and (ctrl.lsu_rw = '1')                                  else '0'; -- store operation
+  cnt_event(hpmcnt_event_ecc_se_imem) <= '1' when (ecc_error_imem_i(0) = '1') else '0';
+
+  --cnt_event(hpmcnt_event_wait_ls_c) <= '1' when (execute_engine.state = MEM_WAIT) and (execute_engine.state_prev2 = MEM_WAIT) else '0'; -- load/store memory wait cycle
+  cnt_event(hpmcnt_event_ecc_de_imem) <= '1' when (ecc_error_imem_i(1) = '1') else '0';
 
   cnt_event(hpmcnt_event_jump_c)    <= '1' when (execute_engine.state = BRANCH)   and (execute_engine.ir(instr_opcode_lsb_c+2) = '1') else '0'; -- jump (unconditional)
   cnt_event(hpmcnt_event_branch_c)  <= '1' when (execute_engine.state = BRANCH)   and (execute_engine.ir(instr_opcode_lsb_c+2) = '0') else '0'; -- branch (conditional, taken or not taken)
-  cnt_event(hpmcnt_event_tbranch_c) <= '1' when (execute_engine.state = BRANCHED) and (execute_engine.state_prev = BRANCH) and
-                                                                                      (execute_engine.ir(instr_opcode_lsb_c+2) = '0') else '0'; -- taken branch (conditional)
+  -- cnt_event(hpmcnt_event_tbranch_c) <= '1' when (execute_engine.state = BRANCHED) and (execute_engine.state_prev = BRANCH) and
+  --                                                                                     (execute_engine.ir(instr_opcode_lsb_c+2) = '0') else '0'; -- taken branch (conditional)
+  cnt_event(hpmcnt_event_dsp_timeout) <= '1' when (dsp_timeout = '1') else '0';
 
   cnt_event(hpmcnt_event_trap_c)    <= '1' when (trap_ctrl.env_enter = '1')                                    else '0'; -- entered trap
   cnt_event(hpmcnt_event_illegal_c) <= '1' when (trap_ctrl.env_enter = '1') and (trap_ctrl.cause = trap_iil_c) else '0'; -- illegal operation
-
 
 -- ****************************************************************************************************************************
 -- CPU Debug Mode (Part of the On-Chip Debugger)

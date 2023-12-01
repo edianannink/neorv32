@@ -88,7 +88,11 @@ entity neorv32_top is
     -- Internal Instruction memory (IMEM) --
     MEM_INT_IMEM_EN            : boolean := false;                              -- implement processor-internal instruction memory
     MEM_INT_IMEM_SIZE          : natural := 16*1024;                            -- size of processor-internal instruction memory in bytes (use a power of 2)
-
+    MEM_INT_IMEM_PREFETCH      : boolean := false;
+    MEM_INT_PREFETCH_BASE      : std_logic_vector(31 downto 0) := x"00000000";
+    MEM_INT_IMEM_SEC           : integer := 1;
+    MEM_INT_IV_EN              : boolean := false;
+    
     -- Internal Data memory (DMEM) --
     MEM_INT_DMEM_EN            : boolean := false;                              -- implement processor-internal data memory
     MEM_INT_DMEM_SIZE          : natural := 8*1024;                             -- size of processor-internal data memory in bytes (use a power of 2)
@@ -246,14 +250,17 @@ entity neorv32_top is
     -- CPU interrupts --
     mtime_irq_i    : in  std_ulogic := 'L'; -- machine timer interrupt, available if IO_MTIME_EN = false
     msw_irq_i      : in  std_ulogic := 'L'; -- machine software interrupt
-    mext_irq_i     : in  std_ulogic := 'L'  -- machine external interrupt
+    mext_irq_i     : in  std_ulogic := 'L'; -- machine external interrupt
+
+    -- instruction validator --
+    illegal_instr: out std_ulogic
   );
 end neorv32_top;
 
 architecture neorv32_top_rtl of neorv32_top is
 
   -- auto-configuration --
-  constant cpu_boot_addr_c : std_ulogic_vector(31 downto 0) := cond_sel_suv_f(INT_BOOTLOADER_EN, mem_boot_base_c, mem_imem_base_c);
+  constant cpu_boot_addr_c : std_ulogic_vector(31 downto 0) := x"00008000"; --cond_sel_suv_f(INT_BOOTLOADER_EN, mem_boot_base_c, mem_imem_base_c);
   constant imem_as_rom_c   : boolean := not INT_BOOTLOADER_EN;
   constant io_gpio_en_c    : boolean := boolean(IO_GPIO_NUM > 0);
   constant io_xirq_en_c    : boolean := boolean(XIRQ_NUM_CH > 0);
@@ -298,12 +305,12 @@ architecture neorv32_top_rtl of neorv32_top is
   signal dci_ndmrstn, dci_halt_req : std_ulogic;
 
   -- bus: core complex --
-  signal cpu_i_req,  cpu_d_req  : bus_req_t; -- CPU core
-  signal cpu_i_rsp,  cpu_d_rsp  : bus_rsp_t; -- CPU core
-  signal icache_req, dcache_req : bus_req_t; -- CPU caches
-  signal icache_rsp, dcache_rsp : bus_rsp_t; -- CPU caches
-  signal core_req               : bus_req_t; -- core complex (CPU + caches)
-  signal core_rsp               : bus_rsp_t; -- core complex (CPU + caches)
+  signal cpu_i_req,  cpu_d_req, req, imem_prefetch_req  : bus_req_t; -- CPU core
+  signal cpu_i_rsp,  cpu_d_rsp                          : bus_rsp_t; -- CPU core
+  signal icache_req, dcache_req                         : bus_req_t; -- CPU caches
+  signal icache_rsp, dcache_rsp                         : bus_rsp_t; -- CPU caches
+  signal core_req                                       : bus_req_t; -- core complex (CPU + caches)
+  signal core_rsp                                       : bus_rsp_t; -- core complex (CPU + caches)
 
   -- bus: core complex + DMA --
   signal main_req, main2_req, dma_req : bus_req_t; -- core complex (CPU + caches + DMA)
@@ -331,6 +338,10 @@ architecture neorv32_top_rtl of neorv32_top is
   end record;
   signal firq      : irq_t;
   signal mtime_irq : std_ulogic;
+
+  -- ECC and IV --
+  signal ecc_error_dmem_o, ecc_error_imem_o : std_ulogic_vector(1 downto 0);
+  signal imem_fetched : std_ulogic;
 
 begin
 
@@ -511,7 +522,9 @@ begin
       PMP_MIN_GRANULARITY        => PMP_MIN_GRANULARITY,
       -- Hardware Performance Monitors (HPM) --
       HPM_NUM_CNTS               => HPM_NUM_CNTS,
-      HPM_CNT_WIDTH              => HPM_CNT_WIDTH
+      HPM_CNT_WIDTH              => HPM_CNT_WIDTH,
+      -- Instruction Validator -- 
+      MEM_INT_IV_EN              => MEM_INT_IV_EN
     )
     port map (
       -- global control --
@@ -532,7 +545,14 @@ begin
       ibus_rsp_i => cpu_i_rsp,
       -- data bus interface --
       dbus_req_o => cpu_d_req,
-      dbus_rsp_i => cpu_d_rsp
+      dbus_rsp_i => cpu_d_rsp,
+      -- ecc --
+      ecc_error_dmem_i => ecc_error_dmem_o,
+      ecc_error_imem_i => ecc_error_imem_o,
+      -- instruction validator
+      illegal_instr => illegal_instr,
+      -- imem fetched --
+      imem_fetched_i => imem_fetched
     );
 
     -- advanced memory control --
@@ -776,7 +796,7 @@ begin
     -- Processor-Internal Instruction Memory (IMEM) -------------------------------------------
     -- -------------------------------------------------------------------------------------------
     neorv32_int_imem_inst_true:
-    if (MEM_INT_IMEM_EN = true) and (imem_size_c > 0) generate
+    if (MEM_INT_IMEM_EN = true) and (imem_size_c > 0) and (MEM_INT_IMEM_PREFETCH = false) generate
       neorv32_int_imem_inst: entity neorv32.neorv32_imem
       generic map (
         IMEM_SIZE    => imem_size_c,
@@ -790,11 +810,33 @@ begin
       );
     end generate;
 
+    neorv32_imem_prefetch_inst_true:
+    if (MEM_INT_IMEM_EN = true) and (imem_size_c > 0) and (MEM_INT_IMEM_PREFETCH = true) generate
+    neorv32_imem_prefetch_inst: entity neorv32.neorv32_imem_prefetch
+      generic map (
+        IMEM_SIZE           => imem_size_c,
+        IMEM_AS_IROM        => imem_as_rom_c,
+        IMEM_SEC            => MEM_INT_IMEM_SEC,
+        IMEM_PREFETCH_BASE  => MEM_INT_PREFETCH_BASE
+      )
+      port map (
+        clk_i     => clk_i,
+        rstn_i    => rstn_sys,
+        bus_req_i => imem_req,
+        bus_rsp_o => imem_rsp,
+        bus_req_o => imem_prefetch_req,
+        bus_rsp_i => xbus_rsp,
+        fetched_o => imem_fetched,
+        ecc_error_o => ecc_error_imem_o
+      );
+    end generate;
+
     neorv32_int_imem_inst_false:
     if (MEM_INT_IMEM_EN = false) or (imem_size_c = 0) generate
       imem_rsp <= rsp_terminate_c;
     end generate;
 
+    req <= xbus_req when imem_fetched = '1' else imem_prefetch_req;
 
     -- Processor-Internal Data Memory (DMEM) --------------------------------------------------
     -- -------------------------------------------------------------------------------------------
@@ -805,10 +847,11 @@ begin
         DMEM_SIZE => dmem_size_c
       )
       port map (
-        clk_i     => clk_i,
-        rstn_i    => rstn_sys,
-        bus_req_i => dmem_req,
-        bus_rsp_o => dmem_rsp
+        clk_i       => clk_i,
+        rstn_i      => rstn_sys,
+        bus_req_i   => dmem_req,
+        bus_rsp_o   => dmem_rsp,
+        ecc_error_o => ecc_error_dmem_o
       );
     end generate;
 
@@ -885,7 +928,7 @@ begin
       port map (
         clk_i     => clk_i,
         rstn_i    => rstn_sys,
-        bus_req_i => xbus_req,
+        bus_req_i => req,
         bus_rsp_o => xbus_rsp,
         --
         wb_tag_o  => wb_tag_o,

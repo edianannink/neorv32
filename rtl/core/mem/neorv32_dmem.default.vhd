@@ -50,7 +50,29 @@ architecture neorv32_dmem_rtl of neorv32_dmem is
   -- tools have issues inferring 32-bit memories that provide dedicated byte-enable signals
   -- and/or with multi-dimensional arrays. [NOTE] Read-during-write behavior is irrelevant
   -- as read and write accesses are mutually exclusive.
-  signal mem_ram_b0, mem_ram_b1, mem_ram_b2, mem_ram_b3 : mem8_t(0 to DMEM_SIZE/4-1);
+  signal mem_ram_b0, mem_ram_b1, mem_ram_b2, mem_ram_b3 : mem8_t(0 to DMEM_SIZE/4-1) := (others => (others => '0'));
+
+  signal mem_ram_b0_rd, mem_ram_b1_rd, mem_ram_b2_rd, mem_ram_b3_rd : std_ulogic_vector(12 downto 0);
+
+  component prim_secded_13_8_enc
+  port (
+    data_i : in std_ulogic_vector(7 downto 0);
+    data_o : out std_ulogic_vector(12 downto 0)
+  );
+  end component;
+
+  component prim_secded_13_8_dec
+  port (
+    data_i : in std_ulogic_vector(12 downto 0);
+    data_o : out std_ulogic_vector(7 downto 0);
+    syndrome_o : out std_ulogic_vector(4 downto 0);
+    err_o : out std_ulogic_vector(1 downto 0)
+  );
+  end component;
+
+  signal ecc_enc_byte0_out, ecc_enc_byte1_out, ecc_enc_byte2_out, ecc_enc_byte3_out : std_ulogic_vector(12 downto 0);
+  signal ecc_error_byte0, ecc_error_byte1, ecc_error_byte2, ecc_error_byte3 : std_ulogic_vector(1 downto 0);
+  signal ecc_error: std_ulogic_vector(1 downto 0);
 
 begin
 
@@ -99,6 +121,75 @@ begin
 
   bus_rsp_o.data <= rdata when (rden = '1') else (others => '0'); -- output gate
   bus_rsp_o.err  <= '0'; -- no access error possible
+
+  -- ECC --------------------------------------------------------------------------------------
+  prim_secded_13_8_enc_inst_byte0 : prim_secded_13_8_enc
+  port map (
+    data_i => bus_req_i.data(7 downto 0),
+    data_o => ecc_enc_byte0_out
+  );
+
+  prim_secded_13_8_enc_inst_byte1 : prim_secded_13_8_enc
+  port map (
+    data_i => bus_req_i.data(15 downto 8),
+    data_o => ecc_enc_byte1_out
+  );
+
+  prim_secded_13_8_enc_inst_byte2 : prim_secded_13_8_enc
+  port map (
+    data_i => bus_req_i.data(23 downto 16),
+    data_o => ecc_enc_byte2_out
+  );
+
+  prim_secded_13_8_enc_inst_byte3 : prim_secded_13_8_enc
+  port map (
+    data_i => bus_req_i.data(31 downto 24),
+    data_o => ecc_enc_byte3_out
+  );
+
+  prim_secded_13_8_dec_inst_byte0: prim_secded_13_8_dec
+    port map (
+      data_i     => mem_ram_b0_rd,
+      data_o     => rdata(7 downto 0),
+      syndrome_o => open,
+      err_o      => ecc_error_byte0
+    );
+
+  prim_secded_13_8_dec_inst_byte1: prim_secded_13_8_dec
+    port map (
+      data_i     => mem_ram_b1_rd,
+      data_o     => rdata(15 downto 8),
+      syndrome_o => open,
+      err_o      => ecc_error_byte1
+    );
+
+  prim_secded_13_8_dec_inst_byte2: prim_secded_13_8_dec
+    port map (
+      data_i     => mem_ram_b2_rd,
+      data_o     => rdata(23 downto 16),
+      syndrome_o => open,
+      err_o      => ecc_error_byte2
+    );
+
+  prim_secded_13_8_dec_inst_byte3: prim_secded_13_8_dec
+    port map (
+      data_i     => mem_ram_b3_rd,
+      data_o     => rdata(31 downto 24),
+      syndrome_o => open,
+      err_o      => ecc_error_byte3
+    );
+
+  ecc_error(0) <= ecc_error_byte0(0) when (bus_req_i.ben(3) = '1') else '0' or 
+                  ecc_error_byte0(0) when (bus_req_i.ben(2) = '1') else '0' or 
+                  ecc_error_byte0(0) when (bus_req_i.ben(1) = '1') else '0' or 
+                  ecc_error_byte0(0) when (bus_req_i.ben(0) = '1') else '0';
+                      
+  ecc_error(1) <= ecc_error_byte0(1) when (bus_req_i.ben(3) = '1') else '0' or 
+                  ecc_error_byte1(1) when (bus_req_i.ben(2) = '1') else '0' or 
+                  ecc_error_byte2(1) when (bus_req_i.ben(1) = '1') else '0' or 
+                  ecc_error_byte3(1) when (bus_req_i.ben(0) = '1') else '0';
+
+  ecc_error_o <= ecc_error when rden = '1' else (others => '0');
 
 
 end neorv32_dmem_rtl;
