@@ -9,7 +9,8 @@ entity neorv32_imem_prefetch is
   generic (
     IMEM_SIZE: natural;
     IMEM_AS_IROM: boolean;
-    IMEM_SEC: integer
+    IMEM_SEC: integer;
+    IMEM_PREFETCH_BASE: std_ulogic_vector(31 downto 0)
   );
   port (
     clk_i       : in std_ulogic;
@@ -140,7 +141,7 @@ begin
   fetch: process(clk_i, rstn_i) begin
     if rstn_i = '0' then
       fsm_state <= start;
-      prefetch_addr <= (others => '0');
+      prefetch_addr <= IMEM_PREFETCH_BASE(XLEN-1 downto 2);
       fetched <= '0';
 		elsif rising_edge(clk_i) then
       case fsm_state is
@@ -150,10 +151,10 @@ begin
           fsm_state <= wait_until_ready;
         when wait_until_ready =>
           if resp = '1' then
-            b0_rom(to_integer(unsigned(prefetch_addr))) <= b0_ecc_enc_o;
-            b1_rom(to_integer(unsigned(prefetch_addr))) <= b1_ecc_enc_o;
-            b2_rom(to_integer(unsigned(prefetch_addr))) <= b2_ecc_enc_o;
-            if to_integer(unsigned(prefetch_addr) + 1) >= (IMEM_SIZE/4) then
+            b0_rom(to_integer(unsigned(prefetch_addr) - unsigned(IMEM_PREFETCH_BASE(XLEN-1 downto 2)))) <= b0_ecc_enc_o;
+            b1_rom(to_integer(unsigned(prefetch_addr) - unsigned(IMEM_PREFETCH_BASE(XLEN-1 downto 2)))) <= b1_ecc_enc_o;
+            b2_rom(to_integer(unsigned(prefetch_addr) - unsigned(IMEM_PREFETCH_BASE(XLEN-1 downto 2)))) <= b2_ecc_enc_o;
+            if to_integer(unsigned(prefetch_addr) - unsigned(IMEM_PREFETCH_BASE(XLEN-1 downto 2)) + 1) >= (IMEM_SIZE/4) then
               fsm_state <= all_fetched;
             else
               prefetch_addr <= std_ulogic_vector(unsigned(prefetch_addr) + 1);

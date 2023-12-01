@@ -83,7 +83,7 @@ architecture neorv32_cpu_regfile_rtl of neorv32_cpu_regfile is
 
   -- register file --
   type   reg_file_t is array ((2**addr_bits_c)-1 downto 0) of std_ulogic_vector(38 downto 0);
-  signal reg_file : reg_file_t;
+  signal reg_file : reg_file_t := (others => (others => '0'));
 
   -- access --
   signal rf_wdata : std_ulogic_vector(XLEN-1 downto 0); -- write-back data
@@ -97,7 +97,8 @@ architecture neorv32_cpu_regfile_rtl of neorv32_cpu_regfile is
   -- ECC signals --
   signal ecc_enc_out : std_ulogic_vector(38 downto 0);
   signal ecc_dec_opa_out, ecc_dec_opb_out, ecc_dec_opc_out, ecc_dec_opd_out: std_ulogic_vector(31 downto 0);
-  signal ecc_dec_opa_err_out, ecc_dec_opb_err_out, ecc_dec_opc_err_out, ecc_dec_opd_err_out: std_ulogic_vector(1 downto 0);
+  signal ecc_dec_opa_err_out, ecc_dec_opb_err_out: std_ulogic_vector(1 downto 0);
+  signal ecc_error: std_ulogic_vector(1 downto 0);
   
   component prim_secded_39_32_enc
   port (
@@ -144,7 +145,7 @@ begin
       data_i     => reg_file(to_integer(unsigned(opc_addr(addr_bits_c-1 downto 0)))),
       data_o     => ecc_dec_opc_out,
       syndrome_o => open,
-      err_o      => ecc_dec_opc_err_out
+      err_o      => open
     );
 
   prim_secded_39_32_dec_inst_opd: prim_secded_39_32_dec
@@ -152,12 +153,13 @@ begin
       data_i     => reg_file(to_integer(unsigned(opd_addr(addr_bits_c-1 downto 0)))),
       data_o     => ecc_dec_opd_out,
       syndrome_o => open,
-      err_o      => ecc_dec_opd_err_out
+      err_o      => open
     );
 
+  ecc_error(0) <= (ecc_dec_opa_err_out(0) or ecc_dec_opb_err_out(0));
+  ecc_error(1) <= (ecc_dec_opa_err_out(1) or ecc_dec_opb_err_out(1));
 
-  ecc_error_o(0) <= ecc_dec_opa_err_out(0) or ecc_dec_opb_err_out(0) or ecc_dec_opc_err_out(0) or ecc_dec_opd_err_out(0);
-  ecc_error_o(1) <= ecc_dec_opa_err_out(1) or ecc_dec_opb_err_out(1) or ecc_dec_opc_err_out(1) or ecc_dec_opd_err_out(1);
+  ecc_error_o <= ecc_error;
 
   -- Data Write-Back Select -----------------------------------------------------------------
   -- -------------------------------------------------------------------------------------------

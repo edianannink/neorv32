@@ -89,7 +89,9 @@ entity neorv32_top is
     MEM_INT_IMEM_EN              : boolean := false;                              -- implement processor-internal instruction memory
     MEM_INT_IMEM_SIZE            : natural := 16*1024;                            -- size of processor-internal instruction memory in bytes (use a power of 2)
     MEM_INT_IMEM_PREFETCH        : boolean := false;
+    MEM_INT_PREFETCH_BASE        : std_logic_vector(31 downto 0) := x"00000000";
     MEM_INT_IMEM_SEC             : integer := 1;
+    MEM_INT_IV_EN                : boolean := false;
 
     -- Internal Data memory (DMEM) --
     MEM_INT_DMEM_EN              : boolean := false;                              -- implement processor-internal data memory
@@ -258,7 +260,7 @@ end neorv32_top;
 architecture neorv32_top_rtl of neorv32_top is
 
   -- auto-configuration --
-  constant cpu_boot_addr_c : std_ulogic_vector(31 downto 0) := cond_sel_suv_f(INT_BOOTLOADER_EN, mem_boot_base_c, mem_imem_base_c);
+  constant cpu_boot_addr_c : std_ulogic_vector(31 downto 0) := x"00008000"; --cond_sel_suv_f(INT_BOOTLOADER_EN, mem_boot_base_c, mem_imem_base_c);
   constant imem_as_rom_c   : boolean := not INT_BOOTLOADER_EN;
   constant io_gpio_en_c    : boolean := boolean(IO_GPIO_NUM > 0);
   constant io_xirq_en_c    : boolean := boolean(XIRQ_NUM_CH > 0);
@@ -515,7 +517,9 @@ begin
       PMP_MIN_GRANULARITY          => PMP_MIN_GRANULARITY,
       -- Hardware Performance Monitors (HPM) --
       HPM_NUM_CNTS                 => HPM_NUM_CNTS,
-      HPM_CNT_WIDTH                => HPM_CNT_WIDTH
+      HPM_CNT_WIDTH                => HPM_CNT_WIDTH,
+      -- Instruction Validator -- 
+      MEM_INT_IV_EN                => MEM_INT_IV_EN
     )
     port map (
       -- global control --
@@ -753,7 +757,7 @@ begin
     IO_BASE     => mem_io_base_c,
     IO_SIZE     => mem_io_size_c,
     -- EXT port --
-    EXT_ENABLE  => false
+    EXT_ENABLE  => MEM_EXT_EN
   )
   port map (
     -- global control --
@@ -804,9 +808,10 @@ begin
     if (MEM_INT_IMEM_EN = true) and (imem_size_c > 0) and (MEM_INT_IMEM_PREFETCH = true) generate
     neorv32_imem_prefetch_inst: entity neorv32.neorv32_imem_prefetch
       generic map (
-        IMEM_SIZE     => imem_size_c,
-        IMEM_AS_IROM  => imem_as_rom_c,
-        IMEM_SEC      => MEM_INT_IMEM_SEC
+        IMEM_SIZE           => imem_size_c,
+        IMEM_AS_IROM        => imem_as_rom_c,
+        IMEM_SEC            => MEM_INT_IMEM_SEC,
+        IMEM_PREFETCH_BASE  => MEM_INT_PREFETCH_BASE
       )
       port map (
         clk_i     => clk_i,
@@ -846,7 +851,6 @@ begin
     neorv32_int_dmem_inst_false:
     if (MEM_INT_DMEM_EN = false) or (dmem_size_c = 0) generate
       dmem_rsp <= rsp_terminate_c;
-      ecc_error_dmem_o <= (others => '0');
     end generate;
 
 
@@ -915,7 +919,7 @@ begin
       )
       port map (
         clk_i     => clk_i,
-        rstn_i    => rstn_sys xor imem_fetched,
+        rstn_i    => rstn_sys,
         bus_req_i => req,
         bus_rsp_o => xbus_rsp,
         --

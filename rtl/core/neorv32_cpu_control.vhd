@@ -80,7 +80,9 @@ entity neorv32_cpu_control is
     PMP_EN                       : boolean; -- physical memory protection enabled
     -- Hardware Performance Monitors (HPM) --
     HPM_NUM_CNTS                 : natural range 0 to 13; -- number of implemented HPM counters (0..13)
-    HPM_CNT_WIDTH                : natural range 0 to 64  -- total size of HPM counters (0..64)
+    HPM_CNT_WIDTH                : natural range 0 to 64; -- total size of HPM counters (0..64)
+    -- Instruction Validator --
+    MEM_INT_IV_EN                : boolean
   );
   port (
     -- global control --
@@ -360,22 +362,26 @@ architecture neorv32_cpu_control_rtl of neorv32_cpu_control is
   signal csr_rdata, xcsr_rdata : std_ulogic_vector(XLEN-1 downto 0);
 
   -- Instruction validator --
-  signal illegal_instr : std_ulogic;
+  signal illegal_instr  : std_ulogic := '0';
+  signal dsp_timeout    : std_ulogic;
 
 begin
 
--- Instruction Validator ------------------------------------------------------------------
+  -- Instruction Validator ------------------------------------------------------------------
   -- -------------------------------------------------------------------------------------------
+  instruction_validator_inst_true:
+  if (MEM_INT_IV_EN = true) generate
   instruction_validator_inst: entity neorv32.instruction_validator
     port map (
-      clk => clk_i,
-      reset => not rstn_i,
-      instr => bus_rsp_i.data,
-      addr(31 downto 30) => "00",
-      addr(29 downto 0) => fetch_engine.pc,
-      ack_instr => bus_rsp_i.ack,
-      illegal_instr => illegal_instr
+      clk               => clk_i,
+      reset             => not rstn_i,
+      instr             => bus_rsp_i.data,
+      addr              => fetch_engine.pc & "00",
+      ack_instr         => bus_rsp_i.ack,
+      illegal_instr     => illegal_instr,
+      dsp_timeout       => dsp_timeout 
     );
+  end generate;
 
   illegal_instr_o <= illegal_instr;
 
@@ -2348,8 +2354,9 @@ begin
 
   cnt_event(hpmcnt_event_jump_c)    <= '1' when (execute_engine.state = BRANCH)   and (execute_engine.ir(instr_opcode_lsb_c+2) = '1') else '0'; -- jump (unconditional)
   cnt_event(hpmcnt_event_branch_c)  <= '1' when (execute_engine.state = BRANCH)   and (execute_engine.ir(instr_opcode_lsb_c+2) = '0') else '0'; -- branch (conditional, taken or not taken)
-  cnt_event(hpmcnt_event_tbranch_c) <= '1' when (execute_engine.state = BRANCHED) and (execute_engine.state_prev = BRANCH) and
-                                                                                      (execute_engine.ir(instr_opcode_lsb_c+2) = '0') else '0'; -- taken branch (conditional)
+  -- cnt_event(hpmcnt_event_tbranch_c) <= '1' when (execute_engine.state = BRANCHED) and (execute_engine.state_prev = BRANCH) and
+  --                                                                                     (execute_engine.ir(instr_opcode_lsb_c+2) = '0') else '0'; -- taken branch (conditional)
+  cnt_event(hpmcnt_event_dsp_timeout) <= '1' when (dsp_timeout = '1') else '0';
 
   cnt_event(hpmcnt_event_trap_c)    <= '1' when (trap_ctrl.env_enter = '1')                                    else '0'; -- entered trap
   cnt_event(hpmcnt_event_illegal_c) <= '1' when (trap_ctrl.env_enter = '1') and (trap_ctrl.cause = trap_iil_c) else '0'; -- illegal operation

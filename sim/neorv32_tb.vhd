@@ -68,7 +68,7 @@ architecture neorv32_tb_rtl of neorv32_tb is
   -- general --
   constant int_imem_c              : boolean := false; -- true: use proc-internal IMEM, false: use external simulated IMEM (ext. mem A)
   constant int_dmem_c              : boolean := false; -- true: use proc-internal DMEM, false: use external simulated DMEM (ext. mem B)
-  constant imem_size_c             : natural := 8*1024; -- size in bytes of processor-internal IMEM / external mem A
+  constant imem_size_c             : natural := 16*1024; -- size in bytes of processor-internal IMEM / external mem A
   constant dmem_size_c             : natural := 8*1024; -- size in bytes of processor-internal DMEM / external mem B
   constant f_clock_c               : natural := 100000000; -- main clock in Hz
   constant baud0_rate_c            : natural := 19200; -- simulation UART0 (primary UART) baud rate
@@ -76,8 +76,8 @@ architecture neorv32_tb_rtl of neorv32_tb is
   constant icache_en_c             : boolean := false; -- implement i-cache
   constant icache_block_size_c     : natural := 64; -- i-cache block size in bytes
   -- simulated external Wishbone memory A (can be used as external IMEM) --
-  constant ext_mem_a_base_addr_c   : std_ulogic_vector(31 downto 0) := x"00000000"; -- wishbone memory base address (external IMEM base)
-  constant ext_mem_a_size_c        : natural := imem_size_c; -- wishbone memory size in bytes
+  constant ext_mem_a_base_addr_c   : std_ulogic_vector(31 downto 0) := x"00004000"; -- wishbone memory base address (external IMEM base)
+  constant ext_mem_a_size_c        : natural := 250*1024; -- wishbone memory size in bytes
   constant ext_mem_a_latency_c     : natural := 8; -- latency in clock cycles (min 1, max 255), plus 1 cycle initial delay
   -- simulated external Wishbone memory B (can be used as external DMEM) --
   constant ext_mem_b_base_addr_c   : std_ulogic_vector(31 downto 0) := x"80000000"; -- wishbone memory base address (external DMEM base)
@@ -156,10 +156,10 @@ architecture neorv32_tb_rtl of neorv32_tb is
   end record;
   signal ext_mem_a, ext_mem_b, ext_mem_c : ext_mem_t;
 
-  constant uart0_rx_logger : logger_t := get_logger("UART0.RX");
-  constant uart1_rx_logger : logger_t := get_logger("UART1.RX");
-  constant uart0_rx_handle : uart_rx_t := new_uart_rx(uart0_baud_val_c, uart0_rx_logger);
-  constant uart1_rx_handle : uart_rx_t := new_uart_rx(uart1_baud_val_c, uart1_rx_logger);
+  -- constant uart0_rx_logger : logger_t := get_logger("UART0.RX");
+  -- constant uart1_rx_logger : logger_t := get_logger("UART1.RX");
+  -- constant uart0_rx_handle : uart_rx_t := new_uart_rx(uart0_baud_val_c, uart0_rx_logger);
+  -- constant uart1_rx_handle : uart_rx_t := new_uart_rx(uart1_baud_val_c, uart1_rx_logger);
 
 begin
   test_runner : process
@@ -170,41 +170,16 @@ begin
 
     rnd.InitSeed(test_runner'path_name);
 
-    -- Show passing checks for UART0 on the display (stdout)
-    show(uart0_rx_logger, display_handler, pass);
-    show(uart1_rx_logger, display_handler, pass);
-
-    if ci_mode then
-      check_uart(net, uart0_rx_handle, nul & nul);
-    else
-      check_uart(net, uart0_rx_handle, "Blinking LED demo program" & cr & lf);
-    end if;
-
-    if ci_mode then
-      -- No need to send the full expectation in one big chunk
-      check_uart(net, uart1_rx_handle, nul & nul);
-      check_uart(net, uart1_rx_handle, "0/56" & cr & lf);
-    end if;
-
-    -- Wait until all expected data has been received
-    --
-    -- wait_until_idle can take the VC actor as argument but
-    -- the more abstract view is that wait_until_idle is part
-    -- of the sync VCI and to use it a VC must be cast
-    -- to a sync VC
-    wait_until_idle(net, as_sync(uart0_rx_handle));
-    wait_until_idle(net, as_sync(uart1_rx_handle));
-
-    -- Wait a bit more if some extra unexpected data is produced. If so,
-    -- uart_rx will fail
-    wait for (20 * (1e9 / baud0_rate_c)) * ns;
+    loop
+      wait;
+    end loop;
 
     test_runner_cleanup(runner);
   end process;
 
   -- In case we get stuck waiting there is a watchdog timeout to terminate and fail the
   -- testbench
-  test_runner_watchdog(runner, 50 ms);
+  test_runner_watchdog(runner, 50000000 ms);
 
   -- Clock/Reset Generator ------------------------------------------------------------------
   -- -------------------------------------------------------------------------------------------
@@ -217,90 +192,92 @@ begin
   neorv32_top_inst: neorv32_top
   generic map (
     -- General --
-    CLOCK_FREQUENCY              => f_clock_c,     -- clock frequency of clk_i in Hz
-    HART_ID                      => x"00000000",   -- hardware thread ID
-    VENDOR_ID                    => x"00000000",   -- vendor's JEDEC ID
-    INT_BOOTLOADER_EN            => false,         -- boot configuration: true = boot explicit bootloader; false = boot from int/ext (I)MEM
+    CLOCK_FREQUENCY              => f_clock_c,      -- clock frequency of clk_i in Hz
+    HART_ID                      => x"00000000",    -- hardware thread ID
+    VENDOR_ID                    => x"00000000",    -- vendor's JEDEC ID
+    INT_BOOTLOADER_EN            => false,          -- boot configuration: true = boot explicit bootloader; false = boot from int/ext (I)MEM
     -- On-Chip Debugger (OCD) --
     ON_CHIP_DEBUGGER_EN          => false,          -- implement on-chip debugger
     -- RISC-V CPU Extensions --
-    CPU_EXTENSION_RISCV_A        => false,          -- implement atomic memory operations extension?
+    CPU_EXTENSION_RISCV_A        => true,          -- implement atomic memory operations extension?
     CPU_EXTENSION_RISCV_B        => false,          -- implement bit-manipulation extension?
-    CPU_EXTENSION_RISCV_C        => true,          -- implement compressed extension?
-    CPU_EXTENSION_RISCV_E        => false,         -- implement embedded RF extension?
-    CPU_EXTENSION_RISCV_M        => true,          -- implement mul/div extension?
-    CPU_EXTENSION_RISCV_U        => true,          -- implement user mode extension?
+    CPU_EXTENSION_RISCV_C        => true,           -- implement compressed extension?
+    CPU_EXTENSION_RISCV_E        => false,          -- implement embedded RF extension?
+    CPU_EXTENSION_RISCV_M        => true,           -- implement mul/div extension?
+    CPU_EXTENSION_RISCV_U        => false,           -- implement user mode extension?
     CPU_EXTENSION_RISCV_Zfinx    => false,          -- implement 32-bit floating-point extension (using INT reg!)
-    CPU_EXTENSION_RISCV_Zicntr   => true,          -- implement base counters?
-    CPU_EXTENSION_RISCV_Zihpm    => true,          -- implement hardware performance monitors?
-    CPU_EXTENSION_RISCV_Zifencei => false,          -- implement instruction stream sync.?
-    CPU_EXTENSION_RISCV_Zmmul    => false,         -- implement multiply-only M sub-extension?
+    CPU_EXTENSION_RISCV_Zicntr   => true,           -- implement base counters?
+    CPU_EXTENSION_RISCV_Zihpm    => true,           -- implement hardware performance monitors?
+    CPU_EXTENSION_RISCV_Zifencei => true,          -- implement instruction stream sync.?
+    CPU_EXTENSION_RISCV_Zmmul    => false,          -- implement multiply-only M sub-extension?
     CPU_EXTENSION_RISCV_Zxcfu    => false,          -- implement custom (instr.) functions unit?
     -- Extension Options --
-    FAST_MUL_EN                  => false,         -- use DSPs for M extension's multiplier
-    FAST_SHIFT_EN                => false,         -- use barrel shifter for shift operations
+    FAST_MUL_EN                  => false,          -- use DSPs for M extension's multiplier
+    FAST_SHIFT_EN                => false,          -- use barrel shifter for shift operations
     -- Physical Memory Protection (PMP) --
-    PMP_NUM_REGIONS              => 5,             -- number of regions (0..16)
-    PMP_MIN_GRANULARITY          => 4,             -- minimal region granularity in bytes, has to be a power of 2, min 4 bytes
+    PMP_NUM_REGIONS              => 5,              -- number of regions (0..16)
+    PMP_MIN_GRANULARITY          => 4,              -- minimal region granularity in bytes, has to be a power of 2, min 4 bytes
     -- Hardware Performance Monitors (HPM) --
-    HPM_NUM_CNTS                 => 12,            -- number of implemented HPM counters (0..29)
-    HPM_CNT_WIDTH                => 40,            -- total size of HPM counters (0..64)
+    HPM_NUM_CNTS                 => 12,             -- number of implemented HPM counters (0..29)
+    HPM_CNT_WIDTH                => 40,             -- total size of HPM counters (0..64)
     -- Atomic Memory Access - Reservation Set Granularity --
-    AMO_RVS_GRANULARITY          => 4,             -- size in bytes, has to be a power of 2, min 4
+    AMO_RVS_GRANULARITY          => 4,              -- size in bytes, has to be a power of 2, min 4
     -- Internal Instruction memory --
-    MEM_INT_IMEM_EN              => true ,   -- implement processor-internal instruction memory
-    MEM_INT_IMEM_SIZE            => imem_size_c,   -- size of processor-internal instruction memory in bytes
+    MEM_INT_IMEM_EN              => true,           -- implement processor-internal instruction memory
+    MEM_INT_IMEM_SIZE            => imem_size_c,    -- size of processor-internal instruction memory in bytes
     MEM_INT_IMEM_PREFETCH        => true,
+    MEM_INT_PREFETCH_BASE        => x"00004000",
+    MEM_INT_IV_EN                => true,
     -- Internal Data memory --
-    MEM_INT_DMEM_EN              => true,    -- implement processor-internal data memory
-    MEM_INT_DMEM_SIZE            => dmem_size_c,   -- size of processor-internal data memory in bytes
+    MEM_INT_DMEM_EN              => true,           -- implement processor-internal data memory
+    MEM_INT_DMEM_SIZE            => dmem_size_c,    -- size of processor-internal data memory in bytes
     -- Internal Cache memory --
-    ICACHE_EN                    => false,         -- implement instruction cache
+    ICACHE_EN                    => false,          -- implement instruction cache
     -- Internal Data Cache (dCACHE) --
-    DCACHE_EN                    => false,         -- implement data cache
+    DCACHE_EN                    => false,          -- implement data cache
     -- External memory interface --
-    MEM_EXT_EN                   => true,          -- implement external memory bus interface?
-    MEM_EXT_TIMEOUT              => 256,           -- cycles after a pending bus access auto-terminates (0 = disabled)
-    MEM_EXT_PIPE_MODE            => false,         -- protocol: false=classic/standard wishbone mode, true=pipelined wishbone mode
-    MEM_EXT_BIG_ENDIAN           => false,         -- byte order: true=big-endian, false=little-endian
+    MEM_EXT_EN                   => true,           -- implement external memory bus interface?
+    MEM_EXT_TIMEOUT              => 256,            -- cycles after a pending bus access auto-terminates (0 = disabled)
+    MEM_EXT_PIPE_MODE            => false,          -- protocol: false=classic/standard wishbone mode, true=pipelined wishbone mode
+    MEM_EXT_BIG_ENDIAN           => false,          -- byte order: true=big-endian, false=little-endian
     MEM_EXT_ASYNC_RX             => false,          -- use register buffer for RX data when false
     MEM_EXT_ASYNC_TX             => false,          -- use register buffer for TX data when false
     -- External Interrupts Controller (XIRQ) --
-    XIRQ_NUM_CH                  => 32,            -- number of external IRQ channels (0..32)
-    XIRQ_TRIGGER_TYPE            => (others => '1'), -- trigger type: 0=level, 1=edge
-    XIRQ_TRIGGER_POLARITY        => (others => '1'), -- trigger polarity: 0=low-level/falling-edge, 1=high-level/rising-edge
+    XIRQ_NUM_CH                  => 32,             -- number of external IRQ channels (0..32)
+    XIRQ_TRIGGER_TYPE            => (others => '1'),-- trigger type: 0=level, 1=edge
+    XIRQ_TRIGGER_POLARITY        => (others => '1'),-- trigger polarity: 0=low-level/falling-edge, 1=high-level/rising-edge
     -- Processor peripherals --
-    IO_GPIO_NUM                  => 64,            -- number of GPIO input/output pairs (0..64)
-    IO_MTIME_EN                  => true,          -- implement machine system timer (MTIME)?
-    IO_UART0_EN                  => true,          -- implement primary universal asynchronous receiver/transmitter (UART0)?
-    IO_UART0_RX_FIFO             => 32,            -- RX fifo depth, has to be a power of two, min 1
-    IO_UART0_TX_FIFO             => 32,            -- TX fifo depth, has to be a power of two, min 1
-    IO_UART1_EN                  => true,          -- implement secondary universal asynchronous receiver/transmitter (UART1)?
-    IO_UART1_RX_FIFO             => 1,             -- RX fifo depth, has to be a power of two, min 1
-    IO_UART1_TX_FIFO             => 1,             -- TX fifo depth, has to be a power of two, min 1
-    IO_SPI_EN                    => true,          -- implement serial peripheral interface (SPI)?
-    IO_SPI_FIFO                  => 4,             -- SPI RTX fifo depth, has to be zero or a power of two
-    IO_SDI_EN                    => true,          -- implement serial data interface (SDI)?
-    IO_SDI_FIFO                  => 4,             -- SDI RTX fifo depth, has to be zero or a power of two
-    IO_TWI_EN                    => true,          -- implement two-wire interface (TWI)?
-    IO_PWM_NUM_CH                => 12,            -- number of PWM channels to implement (0..12); 0 = disabled
-    IO_WDT_EN                    => true,          -- implement watch dog timer (WDT)?
-    IO_TRNG_EN                   => true,          -- implement true random number generator (TRNG)?
-    IO_TRNG_FIFO                 => 4,             -- TRNG fifo depth, has to be a power of two, min 1
-    IO_CFS_EN                    => true,          -- implement custom functions subsystem (CFS)?
-    IO_CFS_CONFIG                => (others => '0'), -- custom CFS configuration generic
-    IO_CFS_IN_SIZE               => 32,            -- size of CFS input conduit in bits
-    IO_CFS_OUT_SIZE              => 32,            -- size of CFS output conduit in bits
-    IO_NEOLED_EN                 => true,          -- implement NeoPixel-compatible smart LED interface (NEOLED)?
-    IO_NEOLED_TX_FIFO            => 8,             -- NEOLED TX FIFO depth, 1..32k, has to be a power of two
-    IO_GPTMR_EN                  => true,          -- implement general purpose timer (GPTMR)?
-    IO_XIP_EN                    => true,          -- implement execute in place module (XIP)?
-    IO_ONEWIRE_EN                => true,          -- implement 1-wire interface (ONEWIRE)?
-    IO_DMA_EN                    => true,          -- implement direct memory access controller (DMA)?
-    IO_SLINK_EN                  => true,          -- implement stream link interface (SLINK)?
-    IO_SLINK_RX_FIFO             => 2,             -- RX fifo depth, has to be a power of two, min 1
-    IO_SLINK_TX_FIFO             => 2,             -- TX fifo depth, has to be a power of two, min 1
-    IO_CRC_EN                    => true           -- implement cyclic redundancy check unit (CRC)?
+    IO_GPIO_NUM                  => 64,             -- number of GPIO input/output pairs (0..64)
+    IO_MTIME_EN                  => true,           -- implement machine system timer (MTIME)?
+    IO_UART0_EN                  => true,           -- implement primary universal asynchronous receiver/transmitter (UART0)?
+    IO_UART0_RX_FIFO             => 32,             -- RX fifo depth, has to be a power of two, min 1
+    IO_UART0_TX_FIFO             => 32,             -- TX fifo depth, has to be a power of two, min 1
+    IO_UART1_EN                  => true,           -- implement secondary universal asynchronous receiver/transmitter (UART1)?
+    IO_UART1_RX_FIFO             => 1,              -- RX fifo depth, has to be a power of two, min 1
+    IO_UART1_TX_FIFO             => 1,              -- TX fifo depth, has to be a power of two, min 1
+    IO_SPI_EN                    => true,           -- implement serial peripheral interface (SPI)?
+    IO_SPI_FIFO                  => 4,              -- SPI RTX fifo depth, has to be zero or a power of two
+    IO_SDI_EN                    => true,           -- implement serial data interface (SDI)?
+    IO_SDI_FIFO                  => 4,              -- SDI RTX fifo depth, has to be zero or a power of two
+    IO_TWI_EN                    => true,           -- implement two-wire interface (TWI)?
+    IO_PWM_NUM_CH                => 12,             -- number of PWM channels to implement (0..12); 0 = disabled
+    IO_WDT_EN                    => true,           -- implement watch dog timer (WDT)?
+    IO_TRNG_EN                   => true,           -- implement true random number generator (TRNG)?
+    IO_TRNG_FIFO                 => 4,              -- TRNG fifo depth, has to be a power of two, min 1
+    IO_CFS_EN                    => true,           -- implement custom functions subsystem (CFS)?
+    IO_CFS_CONFIG                => (others => '0'),-- custom CFS configuration generic
+    IO_CFS_IN_SIZE               => 32,             -- size of CFS input conduit in bits
+    IO_CFS_OUT_SIZE              => 32,             -- size of CFS output conduit in bits
+    IO_NEOLED_EN                 => true,           -- implement NeoPixel-compatible smart LED interface (NEOLED)?
+    IO_NEOLED_TX_FIFO            => 8,              -- NEOLED TX FIFO depth, 1..32k, has to be a power of two
+    IO_GPTMR_EN                  => true,           -- implement general purpose timer (GPTMR)?
+    IO_XIP_EN                    => true,           -- implement execute in place module (XIP)?
+    IO_ONEWIRE_EN                => true,           -- implement 1-wire interface (ONEWIRE)?
+    IO_DMA_EN                    => true,           -- implement direct memory access controller (DMA)?
+    IO_SLINK_EN                  => true,           -- implement stream link interface (SLINK)?
+    IO_SLINK_RX_FIFO             => 2,              -- RX fifo depth, has to be a power of two, min 1
+    IO_SLINK_TX_FIFO             => 2,              -- TX fifo depth, has to be a power of two, min 1
+    IO_CRC_EN                    => true            -- implement cyclic redundancy check unit (CRC)?
   )
   port map (
     -- Global control --
@@ -407,17 +384,17 @@ begin
   sdi_di  <= spi_do;
   spi_di  <= sdi_do when (spi_csn(7) = '0') else spi_do;
 
-  uart0_checker: entity work.uart_rx
-    generic map (uart0_rx_handle)
-    port map (
-      clk => clk_gen,
-      uart_txd => uart0_txd);
+  -- uart0_checker: entity work.uart_rx
+  --   generic map (uart0_rx_handle)
+  --   port map (
+  --     clk => clk_gen,
+  --     uart_txd => uart0_txd);
 
-  uart1_checker: entity work.uart_rx
-    generic map (uart1_rx_handle)
-    port map (
-      clk => clk_gen,
-      uart_txd => uart1_txd);
+  -- uart1_checker: entity work.uart_rx
+  --   generic map (uart1_rx_handle)
+  --   port map (
+  --     clk => clk_gen,
+  --     uart_txd => uart1_txd);
 
 
   -- Wishbone Fabric ------------------------------------------------------------------------
@@ -468,7 +445,7 @@ begin
   generate_ext_imem:
   if (int_imem_c = false) generate
     ext_mem_a_access: process(clk_gen)
-      variable ext_ram_a : mem32_t(0 to ext_mem_a_size_c/4-1) := mem32_init_f(application_init_image, ext_mem_a_size_c/4); -- initialized, used to simulate external IMEM
+      variable ext_ram_a : mem32_t(to_integer(unsigned(ext_mem_a_base_addr_c))/4 to ext_mem_a_size_c/4-1) := mem32_init_f(application_init_image, ext_mem_a_size_c/4-to_integer(unsigned(ext_mem_a_base_addr_c))/4); -- initialized, used to simulate external IMEM
     begin
       if rising_edge(clk_gen) then
         -- control --
@@ -484,7 +461,9 @@ begin
         end if;
 
         -- read access --
-        ext_mem_a.rdata(0) <= ext_ram_a(to_integer(unsigned(wb_mem_a.addr(index_size_f(ext_mem_a_size_c/4)+1 downto 2)))); -- word aligned
+        if to_integer(unsigned(wb_mem_a.addr)) >= to_integer(unsigned(ext_mem_a_base_addr_c)) then
+          ext_mem_a.rdata(0) <= ext_ram_a(to_integer(unsigned(wb_mem_a.addr(index_size_f(ext_mem_a_size_c/4)+1 downto 2)))); -- word aligned
+        end if;
         -- virtual read and ack latency --
         if (ext_mem_a_latency_c > 1) then
           for i in 1 to ext_mem_a_latency_c-1 loop

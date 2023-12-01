@@ -41,12 +41,14 @@ library neorv32;
 entity neorv32_ProcessorTop_Minimal is
   generic (
     -- General --
-    CLOCK_FREQUENCY       : natural := 10000000;      -- clock frequency of clk_i in Hz
+    CLOCK_FREQUENCY       : natural                       := 10000000;      -- clock frequency of clk_i in Hz
     -- Internal Instruction memory --
-    MEM_INT_IMEM_EN       : boolean := true;          -- implement processor-internal instruction memory
-    MEM_INT_IMEM_SIZE     : natural := 16*1024;       -- size of processor-internal instruction memory in bytes
-    MEM_INT_IMEM_PREFETCH : boolean := true;          -- fetch from external memory and store on internal memory
-    MEM_INT_IMEM_SEC      : integer := 1;             -- single error correction 0 = disabled, 1 = enabled
+    MEM_INT_IMEM_EN       : boolean                       := true;          -- implement processor-internal instruction memory
+    MEM_INT_IMEM_SIZE     : natural                       := 16*1024;       -- size of processor-internal instruction memory in bytes
+    MEM_INT_IMEM_PREFETCH : boolean                       := true;          -- fetch from external memory and store on internal memory
+    MEM_INT_PREFETCH_BASE : std_logic_vector(31 downto 0) := x"00004000";
+    MEM_INT_IMEM_SEC      : integer                       := 1;             -- single error correction 0 = disabled, 1 = enabled
+    MEM_INT_IV_EN         : boolean                       := true;
     -- Internal Data memory --
     MEM_INT_DMEM_EN       : boolean := true;          -- implement processor-internal data memory
     MEM_INT_DMEM_SIZE     : natural := 8*1024;        -- size of processor-internal data memory in bytes
@@ -55,21 +57,22 @@ entity neorv32_ProcessorTop_Minimal is
     -- External memory interface (WISHBONE) --
     MEM_EXT_EN            : boolean := true;          -- implement external memory bus interface?
     -- RISC-V CPU Extensions --
-    CPU_EXTENSION_RISCV_A        : boolean := false;  -- implement atomic memory operations extension?
+    CPU_EXTENSION_RISCV_A        : boolean := true;  -- implement atomic memory operations extension?
     CPU_EXTENSION_RISCV_B        : boolean := false;  -- implement bit-manipulation extension?
     CPU_EXTENSION_RISCV_C        : boolean := true;   -- implement compressed extension?
     CPU_EXTENSION_RISCV_E        : boolean := false;  -- implement embedded RF extension?
     CPU_EXTENSION_RISCV_M        : boolean := true;   -- implement mul/div extension?
-    CPU_EXTENSION_RISCV_U        : boolean := true;   -- implement user mode extension?
+    CPU_EXTENSION_RISCV_U        : boolean := false;   -- implement user mode extension?
     CPU_EXTENSION_RISCV_Zfinx    : boolean := false;  -- implement 32-bit floating-point extension (using INT regs!)
     CPU_EXTENSION_RISCV_Zicntr   : boolean := true;   -- implement base counters?
     CPU_EXTENSION_RISCV_Zihpm    : boolean := true;   -- implement hardware performance monitors?
-    CPU_EXTENSION_RISCV_Zifencei : boolean := false;  -- implement instruction stream sync.?
+    CPU_EXTENSION_RISCV_Zifencei : boolean := true;   -- implement instruction stream sync.?
     CPU_EXTENSION_RISCV_Zmmul    : boolean := false;  -- implement multiply-only M sub-extension?
     CPU_EXTENSION_RISCV_Zxcfu    : boolean := false;  -- implement custom (instr.) functions unit?
     -- Processor peripherals --
     IO_GPIO_NUM       : natural range 0 to 64     := 8;     -- number of GPIO input/output pairs (0..64)
     IO_UART0_EN       : boolean                   := true;  -- implement primary universal asynchronous receiver/transmitter (UART0)?
+    IO_MTIME_EN       : boolean                   := true;
     -- Hardware Performance Monitors (HPM) --
     HPM_NUM_CNTS      : natural range 0 to 13 := 13;        -- number of implemented HPM counters (0..13)
     HPM_CNT_WIDTH     : natural range 0 to 64 := 32         -- total size of HPM counters (0..64)
@@ -116,12 +119,14 @@ begin
     MEM_INT_IMEM_EN              => MEM_INT_IMEM_EN,        -- implement processor-internal instruction memory
     MEM_INT_IMEM_SIZE            => MEM_INT_IMEM_SIZE,      -- size of processor-internal instruction memory in bytes
     MEM_INT_IMEM_PREFETCH        => MEM_INT_IMEM_PREFETCH,  -- fetch from external memory and store on internal memory
+    MEM_INT_PREFETCH_BASE        => MEM_INT_PREFETCH_BASE,
     MEM_INT_IMEM_SEC             => MEM_INT_IMEM_SEC,       -- single error correction 0 = disabled, 1 = enabled
+    MEM_INT_IV_EN                => MEM_INT_IV_EN,
     -- Internal Data memory --
     MEM_INT_DMEM_EN              => MEM_INT_DMEM_EN,   -- implement processor-internal data memory
     MEM_INT_DMEM_SIZE            => MEM_INT_DMEM_SIZE, -- size of processor-internal data memory in bytes
     -- Processor peripherals --
-    IO_MTIME_EN                  => true,              -- implement machine system timer (MTIME)?
+    IO_MTIME_EN                  => IO_MTIME_EN,              -- implement machine system timer (MTIME)?
     IO_PWM_NUM_CH                => IO_PWM_NUM_CH,     -- number of PWM channels to implement (0..12); 0 = disabled
     -- External memory interface (WISHBONE) --
     MEM_EXT_EN                   => MEM_EXT_EN,        -- implement external memory bus interface?

@@ -70,7 +70,9 @@ entity neorv32_cpu is
     PMP_MIN_GRANULARITY          : natural; -- minimal region granularity in bytes, has to be a power of 2, min 4 bytes
     -- Hardware Performance Monitors (HPM) --
     HPM_NUM_CNTS                 : natural range 0 to 13; -- number of implemented HPM counters (0..13)
-    HPM_CNT_WIDTH                : natural range 0 to 64  -- total size of HPM counters (0..64)
+    HPM_CNT_WIDTH                : natural range 0 to 64; -- total size of HPM counters (0..64)
+    -- Instruction Validator --
+    MEM_INT_IV_EN                : boolean
   );
   port (
     -- global control --
@@ -221,7 +223,9 @@ begin
     PMP_EN                       => pmp_enable_c,                 -- physical memory protection enabled
     -- Hardware Performance Monitors (HPM) --
     HPM_NUM_CNTS                 => HPM_NUM_CNTS,                 -- number of implemented HPM counters (0..13)
-    HPM_CNT_WIDTH                => HPM_CNT_WIDTH                 -- total size of HPM counters
+    HPM_CNT_WIDTH                => HPM_CNT_WIDTH,                -- total size of HPM counters
+    -- Instruction Validator --
+    MEM_INT_IV_EN                => MEM_INT_IV_EN
   )
   port map (
     -- global control --
