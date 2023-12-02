@@ -211,5 +211,6 @@ files = [
     "/home/edian/git/neorv32-iv-experiments/logic/iv/ram.vhd",
     "/home/edian/git/neorv32-iv-experiments/logic/iv/timeout.vhd",
     "/home/edian/git/neorv32-iv-experiments/logic/iv/multiply_shift.vhd",
-    "/home/edian/git/neorv32-iv-experiments/logic/iv/instruction_validator.vhd"
+    "/home/edian/git/neorv32-iv-experiments/logic/iv/instruction_validator.vhd",
+    "/home/edian/git/neorv32-iv-experiments/logic/iv/oneshot.vhd"
 ]

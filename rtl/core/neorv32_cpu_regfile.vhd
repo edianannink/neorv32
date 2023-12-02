@@ -112,6 +112,7 @@ architecture neorv32_cpu_regfile_rtl of neorv32_cpu_regfile is
   signal ecc_enc_out : std_ulogic_vector(38 downto 0);
   signal ecc_dec_rs1_out, ecc_dec_rs2_out: std_ulogic_vector(31 downto 0);
   signal ecc_dec_rs1_err_out, ecc_dec_rs2_err_out: std_ulogic_vector(1 downto 0);
+  signal ecc_dec_rs1_err_cycle, ecc_dec_rs2_err_cycle: std_ulogic_vector(1 downto 0);
   signal ecc_error: std_ulogic_vector(1 downto 0);
 
 begin
@@ -236,6 +237,28 @@ begin
     rs4_o <= (others => '0');
   end generate;
 
+  oneshot_inst_rs1: entity work.oneshot
+  generic map (
+    TRIGGER_WIDTH => 32
+  )
+  port map (
+    clk_i     => clk_i,
+    trigger   => ecc_dec_rs1_out,
+    sample    => ecc_dec_rs1_err_out,
+    oneshot_o => ecc_dec_rs1_err_cycle
+  );
+
+  oneshot_inst_rs2: entity work.oneshot
+  generic map (
+    TRIGGER_WIDTH => 32
+  )
+  port map (
+    clk_i     => clk_i,
+    trigger   => ecc_dec_rs2_out,
+    sample    => ecc_dec_rs2_err_out,
+    oneshot_o => ecc_dec_rs2_err_cycle
+  );
+
   -- ECC ------------------------------------------------------------------------------------
   -- -------------------------------------------------------------------------------------------
   prim_secded_39_32_enc_inst: prim_secded_39_32_enc
@@ -260,10 +283,9 @@ begin
       err_o      => ecc_dec_rs2_err_out
     );
 
-  ecc_error(0) <= (ecc_dec_rs1_err_out(0) or ecc_dec_rs2_err_out(0));
-  ecc_error(1) <= (ecc_dec_rs1_err_out(1) or ecc_dec_rs2_err_out(1));
+  ecc_error(0) <= (ecc_dec_rs1_err_cycle(0) or ecc_dec_rs2_err_cycle(0));
+  ecc_error(1) <= (ecc_dec_rs1_err_cycle(1) or ecc_dec_rs2_err_cycle(1));
 
   ecc_error_o <= ecc_error;
-
 
 end neorv32_cpu_regfile_rtl;
