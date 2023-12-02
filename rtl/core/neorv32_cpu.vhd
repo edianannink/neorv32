@@ -97,6 +97,7 @@ entity neorv32_cpu is
     -- ecc --
     ecc_error_dmem_i : in std_ulogic_vector(1 downto 0);
     ecc_error_imem_i : in std_ulogic_vector(1 downto 0);
+    ecc_error_regfile_o : out std_ulogic_vector(1 downto 0);
     -- instruction validator --
     illegal_instr: out std_ulogic;
     -- imem fetched --
@@ -419,6 +420,8 @@ begin
     pmp_ex_fault <= '0';
     pmp_rw_fault <= '0';
   end generate;
+
+  ecc_error_regfile_o <= ecc_regfile_error;
 
 
 end neorv32_cpu_rtl;

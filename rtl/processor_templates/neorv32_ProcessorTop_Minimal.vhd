@@ -96,7 +96,9 @@ entity neorv32_ProcessorTop_Minimal is
     gpio_o    : out std_ulogic_vector(7 downto 0); -- parallel output
     -- primary UART0 (available if IO_UART0_EN = true) --
     uart0_txd_o    : out std_ulogic; -- UART0 send data
-    uart0_rxd_i    : in  std_ulogic := 'U' -- UART0 receive data
+    uart0_rxd_i    : in  std_ulogic := 'U'; -- UART0 receive data
+    ecc_dmem_error : out std_ulogic_vector(1 downto 0);
+    ecc_regfile_error : out std_ulogic_vector(1 downto 0)
   );
 end entity;
 
@@ -171,7 +173,9 @@ begin
     uart0_txd_o => uart0_txd_o, -- UART0 send data
     uart0_rxd_i => uart0_rxd_i, -- UART0 receive data
     -- instruction validator --
-    illegal_instr => illegal_instr
+    illegal_instr => illegal_instr,
+    ecc_dmem_error => ecc_dmem_error,
+    ecc_regfile_error => ecc_regfile_error
   );
 
   -- GPIO --

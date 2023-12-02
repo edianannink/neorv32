@@ -82,8 +82,8 @@ architecture neorv32_cpu_regfile_rtl of neorv32_cpu_regfile is
   constant addr_bits_c : natural := cond_sel_natural_f(RVE, 4, 5); -- address width
 
   -- register file --
-  type   reg_file_t is array ((2**addr_bits_c)-1 downto 0) of std_ulogic_vector(38 downto 0);
-  signal reg_file : reg_file_t := (others => (others => '0'));
+  type reg_file_t is array ((2**addr_bits_c)-1 downto 0) of std_ulogic_vector(38 downto 0);
+  signal reg_file : reg_file_t;
 
   -- access --
   signal rf_wdata : std_ulogic_vector(XLEN-1 downto 0); -- write-back data
@@ -96,7 +96,7 @@ architecture neorv32_cpu_regfile_rtl of neorv32_cpu_regfile is
 
   -- ECC signals --
   signal ecc_enc_out : std_ulogic_vector(38 downto 0);
-  signal ecc_dec_opa_out, ecc_dec_opb_out, ecc_dec_opc_out, ecc_dec_opd_out: std_ulogic_vector(31 downto 0);
+  signal ecc_dec_opa_out, ecc_dec_opb_out: std_ulogic_vector(31 downto 0);
   signal ecc_dec_opa_err_out, ecc_dec_opb_err_out: std_ulogic_vector(1 downto 0);
   signal ecc_error: std_ulogic_vector(1 downto 0);
   
@@ -138,22 +138,6 @@ begin
       data_o     => ecc_dec_opb_out,
       syndrome_o => open,
       err_o      => ecc_dec_opb_err_out
-    );
-
-  prim_secded_39_32_dec_inst_opc: prim_secded_39_32_dec
-    port map (
-      data_i     => reg_file(to_integer(unsigned(opc_addr(addr_bits_c-1 downto 0)))),
-      data_o     => ecc_dec_opc_out,
-      syndrome_o => open,
-      err_o      => open
-    );
-
-  prim_secded_39_32_dec_inst_opd: prim_secded_39_32_dec
-    port map (
-      data_i     => reg_file(to_integer(unsigned(opd_addr(addr_bits_c-1 downto 0)))),
-      data_o     => ecc_dec_opd_out,
-      syndrome_o => open,
-      err_o      => open
     );
 
   ecc_error(0) <= (ecc_dec_opa_err_out(0) or ecc_dec_opb_err_out(0));
@@ -200,20 +184,6 @@ begin
       end if;
       rs1_o <= ecc_dec_opa_out;
       rs2_o <= ecc_dec_opb_out;
-
-      -- optional 3rd read port --
-      if (RS3_EN = true) then
-        rs3_o <= ecc_dec_opc_out;
-      else
-        rs3_o <= (others => '0');
-      end if;
-
-      -- optional 4th read port --
-      if (RS4_EN = true) then
-        rs4_o <= ecc_dec_opd_out;
-      else
-        rs4_o <= (others => '0');
-      end if;
     end if;
   end process register_file;
 

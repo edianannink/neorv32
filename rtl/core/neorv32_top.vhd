@@ -253,7 +253,9 @@ entity neorv32_top is
     mext_irq_i     : in  std_ulogic := 'L'; -- machine external interrupt
 
     -- instruction validator --
-    illegal_instr: out std_ulogic
+    illegal_instr: out std_ulogic;
+    ecc_dmem_error : out std_ulogic_vector(1 downto 0);
+    ecc_regfile_error : out std_ulogic_vector(1 downto 0)
   );
 end neorv32_top;
 
@@ -544,6 +546,7 @@ begin
       -- ecc --
       ecc_error_dmem_i => ecc_error_dmem_o,
       ecc_error_imem_i => ecc_error_imem_o,
+      ecc_error_regfile_o => ecc_regfile_error,
       -- instruction validator
       illegal_instr => illegal_instr,
       -- imem fetched --
@@ -1624,5 +1627,6 @@ begin
     dci_halt_req          <= '0';
   end generate;
 
+  ecc_dmem_error <= ecc_error_dmem_o;
 
 end neorv32_top_rtl;

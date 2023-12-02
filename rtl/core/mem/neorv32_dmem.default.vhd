@@ -53,10 +53,10 @@ architecture neorv32_dmem_rtl of neorv32_dmem is
   -- -------------------------------------------------------------------------------------------------------------- --
 
   -- RAM - not initialized at all --
-  signal mem_ram_b0 : mem13_t(0 to DMEM_SIZE/4-1) := (others => (others => '0'));
-  signal mem_ram_b1 : mem13_t(0 to DMEM_SIZE/4-1) := (others => (others => '0'));
-  signal mem_ram_b2 : mem13_t(0 to DMEM_SIZE/4-1) := (others => (others => '0'));
-  signal mem_ram_b3 : mem13_t(0 to DMEM_SIZE/4-1) := (others => (others => '0'));
+  signal mem_ram_b0 : mem13_t(0 to DMEM_SIZE/4-1);
+  signal mem_ram_b1 : mem13_t(0 to DMEM_SIZE/4-1);
+  signal mem_ram_b2 : mem13_t(0 to DMEM_SIZE/4-1);
+  signal mem_ram_b3 : mem13_t(0 to DMEM_SIZE/4-1);
 
   -- read data --
   signal mem_ram_b0_rd, mem_ram_b1_rd, mem_ram_b2_rd, mem_ram_b3_rd : std_ulogic_vector(12 downto 0);
@@ -198,15 +198,15 @@ begin
       err_o      => ecc_error_byte3
     );
 
-  ecc_error(0) <= ecc_error_byte0(0) when (bus_req_i.ben(3) = '1') else '0' or 
-                  ecc_error_byte0(0) when (bus_req_i.ben(2) = '1') else '0' or 
-                  ecc_error_byte0(0) when (bus_req_i.ben(1) = '1') else '0' or 
-                  ecc_error_byte0(0) when (bus_req_i.ben(0) = '1') else '0';
+  ecc_error(0) <= ecc_error_byte0(0) when (bus_req_i.ben(0) = '1') else '0' or 
+                  ecc_error_byte1(0) when (bus_req_i.ben(1) = '1') else '0' or 
+                  ecc_error_byte2(0) when (bus_req_i.ben(2) = '1') else '0' or 
+                  ecc_error_byte3(0) when (bus_req_i.ben(3) = '1') else '0';
                       
-  ecc_error(1) <= ecc_error_byte0(1) when (bus_req_i.ben(3) = '1') else '0' or 
-                  ecc_error_byte1(1) when (bus_req_i.ben(2) = '1') else '0' or 
-                  ecc_error_byte2(1) when (bus_req_i.ben(1) = '1') else '0' or 
-                  ecc_error_byte3(1) when (bus_req_i.ben(0) = '1') else '0';
+  ecc_error(1) <= ecc_error_byte0(1) when (bus_req_i.ben(0) = '1') else '0' or 
+                  ecc_error_byte1(1) when (bus_req_i.ben(1) = '1') else '0' or 
+                  ecc_error_byte2(1) when (bus_req_i.ben(2) = '1') else '0' or 
+                  ecc_error_byte3(1) when (bus_req_i.ben(3) = '1') else '0';
 
   ecc_error_o <= ecc_error when rden = '1' else (others => '0');
 

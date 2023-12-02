@@ -2,7 +2,7 @@
 -- Auto-generated memory initialization file (for APPLICATION) from source file <coremark/../../cores/neorv32/bin/riscv-target-firmware.bin>
 -- Size: 32940 bytes
 -- MARCH: default
--- Built: 01.12.2023 11:19:24
+-- Built: 02.12.2023 14:54:40
 
 -- prototype defined in 'neorv32_package.vhd'
 package body neorv32_application_image is
