@@ -30,10 +30,10 @@ NEORV32.add_source_files([
     # hence subdir 'mem' is not picked by the previous pattern
     ROOT / ".." / "rtl" / "core" / "mem" / "*.vhd",
     ROOT / "../../../" / "logic" / "iv" / "ram.vhd",
-    ROOT / "../../../" / "logic" / "iv" / "timeout.vhd",
     ROOT / "../../../" / "logic" / "iv" / "multiply_shift.vhd",
     ROOT / "../../../" / "logic" / "iv" / "instruction_validator.vhd",
-    ROOT / "../../../" / "logic" / "iv" / "oneshot.vhd"
+    ROOT / "../../../" / "logic" / "misc" / "timeout.vhd",
+    ROOT / "../../../" / "logic" / "misc" / "oneshot.vhd"
 ])
 
 NEORV32.test_bench("neorv32_tb").set_generic("ci_mode", args.ci_mode)
