@@ -68,6 +68,8 @@ entity neorv32_ProcessorTop_Minimal is
     CPU_EXTENSION_RISCV_Zihpm    : boolean := true;   -- implement hardware performance monitors?
     CPU_EXTENSION_RISCV_Zmmul    : boolean := false;  -- implement multiply-only M sub-extension?
     CPU_EXTENSION_RISCV_Zxcfu    : boolean := false;  -- implement custom (instr.) functions unit?
+    -- Tuning Options --
+    REGFILE_HW_RST               : boolean := true;                              -- implement full hardware reset for register file
     -- Processor peripherals --
     IO_GPIO_NUM       : natural range 0 to 64     := 8;     -- number of GPIO input/output pairs (0..64)
     IO_UART0_EN       : boolean                   := true;  -- implement primary universal asynchronous receiver/transmitter (UART0)?
@@ -141,6 +143,8 @@ begin
     CPU_EXTENSION_RISCV_Zihpm    => CPU_EXTENSION_RISCV_Zihpm,     -- implement hardware performance monitors?
     CPU_EXTENSION_RISCV_Zmmul    => CPU_EXTENSION_RISCV_Zmmul,     -- implement multiply-only M sub-extension?
     CPU_EXTENSION_RISCV_Zxcfu    => CPU_EXTENSION_RISCV_Zxcfu,     -- implement custom (instr.) functions unit?
+    -- Tuning Options --
+    REGFILE_HW_RST               => REGFILE_HW_RST,                             -- implement full hardware reset for register file
     -- Processor peripherals --
     IO_GPIO_NUM                  => IO_GPIO_NUM,         -- number of GPIO input/output pairs (0..64)
     IO_UART0_EN                  => IO_UART0_EN,         -- implement primary universal asynchronous receiver/transmitter (UART0)?

@@ -81,8 +81,24 @@ architecture neorv32_cpu_regfile_rtl of neorv32_cpu_regfile is
   constant addr_bits_c : natural := cond_sel_natural_f(RVE_EN, 4, 5); -- address width
 
   -- register file --
-  type   reg_file_t is array ((2**addr_bits_c)-1 downto 0) of std_ulogic_vector(XLEN-1 downto 0);
+  type   reg_file_t is array ((2**addr_bits_c)-1 downto 0) of std_ulogic_vector(38 downto 0);
   signal reg_file : reg_file_t;
+
+  component prim_secded_39_32_enc
+  port (
+    data_i : in std_ulogic_vector(31 downto 0);
+    data_o : out std_ulogic_vector(38 downto 0)
+  );
+  end component;
+
+  component prim_secded_39_32_dec
+  port (
+    data_i : in std_ulogic_vector(38 downto 0);
+    data_o : out std_ulogic_vector(31 downto 0);
+    syndrome_o : out std_ulogic_vector(6 downto 0);
+    err_o : out std_ulogic_vector(1 downto 0)
+  );
+  end component;
 
   -- access --
   signal rf_wdata  : std_ulogic_vector(XLEN-1 downto 0); -- write-back data
@@ -91,6 +107,12 @@ architecture neorv32_cpu_regfile_rtl of neorv32_cpu_regfile is
   signal rd_zero   : std_ulogic; -- writing to x0?
   signal opa_addr  : std_ulogic_vector(4 downto 0); -- rs1/rd address
   signal rs4_addr  : std_ulogic_vector(4 downto 0); -- rs4 address
+
+  -- ECC signals --
+  signal ecc_enc_out : std_ulogic_vector(38 downto 0);
+  signal ecc_dec_rs1_out, ecc_dec_rs2_out: std_ulogic_vector(31 downto 0);
+  signal ecc_dec_rs1_err_out, ecc_dec_rs2_err_out: std_ulogic_vector(1 downto 0);
+  signal ecc_error: std_ulogic_vector(1 downto 0);
 
 begin
 
@@ -161,7 +183,7 @@ begin
           reg_file(i) <= (others => '0');
         elsif rising_edge(clk_i) then
           if (rf_we_sel(i) = '1') then
-            reg_file(i) <= rf_wdata;
+            reg_file(i) <= ecc_enc_out;
           end if;
         end if;
       end process register_file;
@@ -172,8 +194,8 @@ begin
     rf_read: process(clk_i)
     begin
       if rising_edge(clk_i) then
-        rs1_o <= reg_file(to_integer(unsigned(ctrl_i.rf_rs1(addr_bits_c-1 downto 0))));
-        rs2_o <= reg_file(to_integer(unsigned(ctrl_i.rf_rs2(addr_bits_c-1 downto 0))));
+        rs1_o <= ecc_dec_rs1_out;
+        rs2_o <= ecc_dec_rs2_out;
       end if;
     end process rf_read;
 
@@ -213,6 +235,35 @@ begin
   if not RS4_EN generate
     rs4_o <= (others => '0');
   end generate;
+
+  -- ECC ------------------------------------------------------------------------------------
+  -- -------------------------------------------------------------------------------------------
+  prim_secded_39_32_enc_inst: prim_secded_39_32_enc
+    port map (
+      data_i => rf_wdata,
+      data_o => ecc_enc_out
+    );
+
+  prim_secded_39_32_dec_inst_opa: prim_secded_39_32_dec
+    port map (
+      data_i     => reg_file(to_integer(unsigned(ctrl_i.rf_rs1(addr_bits_c-1 downto 0)))),
+      data_o     => ecc_dec_rs1_out,
+      syndrome_o => open,
+      err_o      => ecc_dec_rs1_err_out
+    );
+
+  prim_secded_39_32_dec_inst_opb: prim_secded_39_32_dec
+    port map (
+      data_i     => reg_file(to_integer(unsigned(ctrl_i.rf_rs2(addr_bits_c-1 downto 0)))),
+      data_o     => ecc_dec_rs2_out,
+      syndrome_o => open,
+      err_o      => ecc_dec_rs2_err_out
+    );
+
+  ecc_error(0) <= (ecc_dec_rs1_err_out(0) or ecc_dec_rs2_err_out(0));
+  ecc_error(1) <= (ecc_dec_rs1_err_out(1) or ecc_dec_rs2_err_out(1));
+
+  ecc_error_o <= ecc_error;
 
 
 end neorv32_cpu_regfile_rtl;

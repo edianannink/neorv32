@@ -50,7 +50,7 @@ architecture neorv32_dmem_rtl of neorv32_dmem is
   -- tools have issues inferring 32-bit memories that provide dedicated byte-enable signals
   -- and/or with multi-dimensional arrays. [NOTE] Read-during-write behavior is irrelevant
   -- as read and write accesses are mutually exclusive.
-  signal mem_ram_b0, mem_ram_b1, mem_ram_b2, mem_ram_b3 : mem8_t(0 to DMEM_SIZE/4-1) := (others => (others => '0'));
+  signal mem_ram_b0, mem_ram_b1, mem_ram_b2, mem_ram_b3 : mem13_t(0 to DMEM_SIZE/4-1);
 
   signal mem_ram_b0_rd, mem_ram_b1_rd, mem_ram_b2_rd, mem_ram_b3_rd : std_ulogic_vector(12 downto 0);
 
@@ -83,22 +83,22 @@ begin
     if rising_edge(clk_i) then -- no reset to infer block RAM
       if (bus_req_i.stb = '1') and (bus_req_i.rw = '1') then
         if (bus_req_i.ben(0) = '1') then -- byte 0
-          mem_ram_b0(to_integer(unsigned(addr))) <= bus_req_i.data(07 downto 00);
+          mem_ram_b0(to_integer(unsigned(addr))) <= ecc_enc_byte0_out;
         end if;
         if (bus_req_i.ben(1) = '1') then -- byte 1
-          mem_ram_b1(to_integer(unsigned(addr))) <= bus_req_i.data(15 downto 08);
+          mem_ram_b1(to_integer(unsigned(addr))) <= ecc_enc_byte1_out;
         end if;
         if (bus_req_i.ben(2) = '1') then -- byte 2
-          mem_ram_b2(to_integer(unsigned(addr))) <= bus_req_i.data(23 downto 16);
+          mem_ram_b2(to_integer(unsigned(addr))) <= ecc_enc_byte2_out;
         end if;
         if (bus_req_i.ben(3) = '1') then -- byte 3
-          mem_ram_b3(to_integer(unsigned(addr))) <= bus_req_i.data(31 downto 24);
+          mem_ram_b3(to_integer(unsigned(addr))) <= ecc_enc_byte3_out;
         end if;
       end if;
-      rdata(07 downto 00) <= mem_ram_b0(to_integer(unsigned(addr)));
-      rdata(15 downto 08) <= mem_ram_b1(to_integer(unsigned(addr)));
-      rdata(23 downto 16) <= mem_ram_b2(to_integer(unsigned(addr)));
-      rdata(31 downto 24) <= mem_ram_b3(to_integer(unsigned(addr)));
+      mem_ram_b0_rd <= mem_ram_b0(to_integer(unsigned(addr)));
+      mem_ram_b1_rd <= mem_ram_b1(to_integer(unsigned(addr)));
+      mem_ram_b2_rd <= mem_ram_b2(to_integer(unsigned(addr)));
+      mem_ram_b3_rd <= mem_ram_b3(to_integer(unsigned(addr)));
     end if;
   end process mem_access;
 
@@ -179,15 +179,15 @@ begin
       err_o      => ecc_error_byte3
     );
 
-  ecc_error(0) <= ecc_error_byte0(0) when (bus_req_i.ben(3) = '1') else '0' or 
-                  ecc_error_byte0(0) when (bus_req_i.ben(2) = '1') else '0' or 
-                  ecc_error_byte0(0) when (bus_req_i.ben(1) = '1') else '0' or 
-                  ecc_error_byte0(0) when (bus_req_i.ben(0) = '1') else '0';
+  ecc_error(0) <= ecc_error_byte0(0) when (bus_req_i.ben(0) = '1') else '0' or 
+                  ecc_error_byte1(0) when (bus_req_i.ben(1) = '1') else '0' or 
+                  ecc_error_byte2(0) when (bus_req_i.ben(2) = '1') else '0' or 
+                  ecc_error_byte3(0) when (bus_req_i.ben(3) = '1') else '0';
                       
-  ecc_error(1) <= ecc_error_byte0(1) when (bus_req_i.ben(3) = '1') else '0' or 
-                  ecc_error_byte1(1) when (bus_req_i.ben(2) = '1') else '0' or 
-                  ecc_error_byte2(1) when (bus_req_i.ben(1) = '1') else '0' or 
-                  ecc_error_byte3(1) when (bus_req_i.ben(0) = '1') else '0';
+  ecc_error(1) <= ecc_error_byte0(1) when (bus_req_i.ben(0) = '1') else '0' or 
+                  ecc_error_byte1(1) when (bus_req_i.ben(1) = '1') else '0' or 
+                  ecc_error_byte2(1) when (bus_req_i.ben(2) = '1') else '0' or 
+                  ecc_error_byte3(1) when (bus_req_i.ben(3) = '1') else '0';
 
   ecc_error_o <= ecc_error when rden = '1' else (others => '0');
 

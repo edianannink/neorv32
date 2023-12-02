@@ -25,9 +25,9 @@ entity neorv32_imem_prefetch is
 end entity;
 
 architecture rtl of neorv32_imem_prefetch is
-  signal b0_rom : mem15_t(0 to IMEM_SIZE/4-1) := (others => (others => '0'));
-  signal b1_rom : mem16_t(0 to IMEM_SIZE/4-1) := (others => (others => '0'));
-  signal b2_rom : mem16_t(0 to IMEM_SIZE/4-1) := (others => (others => '0'));
+  signal b0_rom : mem15_t(0 to IMEM_SIZE/4-1);
+  signal b1_rom : mem16_t(0 to IMEM_SIZE/4-1);
+  signal b2_rom : mem16_t(0 to IMEM_SIZE/4-1);
 
 	signal prefetch_addr  : std_ulogic_vector(XLEN-1 downto 2);
   signal fetched        : std_ulogic;
