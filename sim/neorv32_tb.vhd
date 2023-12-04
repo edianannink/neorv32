@@ -70,7 +70,7 @@ architecture neorv32_tb_rtl of neorv32_tb is
   constant int_imem_c              : boolean := false; -- true: use proc-internal IMEM, false: use external simulated IMEM (ext. mem A)
   constant int_dmem_c              : boolean := false; -- true: use proc-internal DMEM, false: use external simulated DMEM (ext. mem B)
   constant imem_size_c             : natural := 16*1024; -- size in bytes of processor-internal IMEM / external mem A
-  constant dmem_size_c             : natural := 8*1024; -- size in bytes of processor-internal DMEM / external mem B
+  constant dmem_size_c             : natural := 4*1024; -- size in bytes of processor-internal DMEM / external mem B
   constant f_clock_c               : natural := 100000000; -- main clock in Hz
   constant baud0_rate_c            : natural := 19200; -- simulation UART0 (primary UART) baud rate
   constant baud1_rate_c            : natural := 19200; -- simulation UART1 (secondary UART) baud rate

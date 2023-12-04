@@ -41,42 +41,42 @@ library neorv32;
 entity neorv32_ProcessorTop_Minimal is
   generic (
     -- General --
-    CLOCK_FREQUENCY       : natural                       := 50000000;      -- clock frequency of clk_i in Hz
+    CLOCK_FREQUENCY       : natural                       := 50000000;    -- clock frequency of clk_i in Hz
     -- Internal Instruction memory --
-    MEM_INT_IMEM_EN       : boolean                       := true;          -- implement processor-internal instruction memory
-    MEM_INT_IMEM_SIZE     : natural                       := 16*1024;       -- size of processor-internal instruction memory in bytes
-    MEM_INT_IMEM_PREFETCH : boolean                       := true;          -- fetch from external memory and store on internal memory
-    MEM_INT_PREFETCH_BASE : std_logic_vector(31 downto 0) := x"00004000";
-    MEM_INT_IMEM_SEC      : integer                       := 1;             -- single error correction 0 = disabled, 1 = enabled
+    MEM_INT_IMEM_EN       : boolean                       := true;        -- implement processor-internal instruction memory
+    MEM_INT_IMEM_SIZE     : natural                       := 16*1024;      -- size of processor-internal instruction memory in bytes
+    MEM_INT_IMEM_PREFETCH : boolean                       := true;        -- fetch from external memory and store on internal memory
+    MEM_INT_PREFETCH_BASE : std_logic_vector(31 downto 0) := x"00004000"; -- address where instruction memory starts prefetch (eNVM in this case)
+    MEM_INT_IMEM_SEC      : integer                       := 1;           -- single error correction 0 = disabled, 1 = enabled
     MEM_INT_IV_EN         : boolean                       := true;
     -- Internal Data memory --
-    MEM_INT_DMEM_EN       : boolean := true;          -- implement processor-internal data memory
-    MEM_INT_DMEM_SIZE     : natural := 8*1024;        -- size of processor-internal data memory in bytes
+    MEM_INT_DMEM_EN       : boolean                       := true;        -- implement processor-internal data memory
+    MEM_INT_DMEM_SIZE     : natural                       := 4*1024;      -- size of processor-internal data memory in bytes
     -- Processor peripherals --
-    IO_PWM_NUM_CH         : natural := 0;             -- number of PWM channels to implement (0..12); 0 = disabled
+    IO_PWM_NUM_CH         : natural                       := 0;           -- number of PWM channels to implement (0..12); 0 = disabled
     -- External memory interface (WISHBONE) --
-    MEM_EXT_EN            : boolean := true;          -- implement external memory bus interface?
+    MEM_EXT_EN            : boolean                       := true;        -- implement external memory bus interface?
     -- RISC-V CPU Extensions --
-    CPU_EXTENSION_RISCV_A        : boolean := true;  -- implement atomic memory operations extension?
-    CPU_EXTENSION_RISCV_B        : boolean := false;  -- implement bit-manipulation extension?
-    CPU_EXTENSION_RISCV_C        : boolean := true;   -- implement compressed extension?
-    CPU_EXTENSION_RISCV_E        : boolean := false;  -- implement embedded RF extension?
-    CPU_EXTENSION_RISCV_M        : boolean := true;   -- implement mul/div extension?
-    CPU_EXTENSION_RISCV_U        : boolean := false;   -- implement user mode extension?
-    CPU_EXTENSION_RISCV_Zfinx    : boolean := false;  -- implement 32-bit floating-point extension (using INT regs!)
-    CPU_EXTENSION_RISCV_Zicntr   : boolean := true;   -- implement base counters?
-    CPU_EXTENSION_RISCV_Zihpm    : boolean := true;   -- implement hardware performance monitors?
-    CPU_EXTENSION_RISCV_Zmmul    : boolean := false;  -- implement multiply-only M sub-extension?
-    CPU_EXTENSION_RISCV_Zxcfu    : boolean := false;  -- implement custom (instr.) functions unit?
+    CPU_EXTENSION_RISCV_A        : boolean                := true;        -- implement atomic memory operations extension?
+    CPU_EXTENSION_RISCV_B        : boolean                := false;       -- implement bit-manipulation extension?
+    CPU_EXTENSION_RISCV_C        : boolean                := true;        -- implement compressed extension?
+    CPU_EXTENSION_RISCV_E        : boolean                := false;       -- implement embedded RF extension?
+    CPU_EXTENSION_RISCV_M        : boolean                := true;        -- implement mul/div extension?
+    CPU_EXTENSION_RISCV_U        : boolean                := false;       -- implement user mode extension?
+    CPU_EXTENSION_RISCV_Zfinx    : boolean                := false;       -- implement 32-bit floating-point extension (using INT regs!)
+    CPU_EXTENSION_RISCV_Zicntr   : boolean                := true;        -- implement base counters?
+    CPU_EXTENSION_RISCV_Zihpm    : boolean                := true;        -- implement hardware performance monitors?
+    CPU_EXTENSION_RISCV_Zmmul    : boolean                := false;       -- implement multiply-only M sub-extension?
+    CPU_EXTENSION_RISCV_Zxcfu    : boolean                := false;       -- implement custom (instr.) functions unit?
     -- Tuning Options --
-    REGFILE_HW_RST               : boolean := true;                              -- implement full hardware reset for register file
+    REGFILE_HW_RST               : boolean                := true;        -- implement full hardware reset for register file
     -- Processor peripherals --
-    IO_GPIO_NUM       : natural range 0 to 64     := 8;     -- number of GPIO input/output pairs (0..64)
-    IO_UART0_EN       : boolean                   := true;  -- implement primary universal asynchronous receiver/transmitter (UART0)?
-    IO_MTIME_EN       : boolean                   := true;
+    IO_GPIO_NUM       : natural range 0 to 64             := 8;           -- number of GPIO input/output pairs (0..64)
+    IO_UART0_EN       : boolean                           := true;        -- implement primary universal asynchronous receiver/transmitter (UART0)?
+    IO_MTIME_EN       : boolean                           := true;
     -- Hardware Performance Monitors (HPM) --
-    HPM_NUM_CNTS      : natural range 0 to 13 := 13;        -- number of implemented HPM counters (0..13)
-    HPM_CNT_WIDTH     : natural range 0 to 64 := 32         -- total size of HPM counters (0..64)
+    HPM_NUM_CNTS      : natural range 0 to 13             := 13;          -- number of implemented HPM counters (0..13)
+    HPM_CNT_WIDTH     : natural range 0 to 64             := 32           -- total size of HPM counters (0..64)
   );
   port (
     -- Global control --
@@ -177,13 +177,6 @@ begin
   );
 
   -- GPIO --
-  gpio_o(0) <= illegal_instr;
-  gpio_o(1) <= illegal_instr;
-  gpio_o(2) <= illegal_instr;
-  gpio_o(3) <= illegal_instr;
-  gpio_o(4) <= illegal_instr;
-  gpio_o(5) <= illegal_instr;
-  gpio_o(6) <= illegal_instr;
-  gpio_o(7) <= illegal_instr;
+  gpio_o <= (others => '0'); -- NO GPIO for now
 
 end architecture;
