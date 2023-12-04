@@ -41,7 +41,7 @@ library neorv32;
 entity neorv32_ProcessorTop_Minimal is
   generic (
     -- General --
-    CLOCK_FREQUENCY       : natural                       := 10000000;      -- clock frequency of clk_i in Hz
+    CLOCK_FREQUENCY       : natural                       := 50000000;      -- clock frequency of clk_i in Hz
     -- Internal Instruction memory --
     MEM_INT_IMEM_EN       : boolean                       := true;          -- implement processor-internal instruction memory
     MEM_INT_IMEM_SIZE     : natural                       := 16*1024;       -- size of processor-internal instruction memory in bytes
