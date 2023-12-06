@@ -790,7 +790,7 @@ package neorv32_package is
       MEM_INT_IMEM_SIZE          : natural := 16*1024;
       MEM_INT_IMEM_PREFETCH      : boolean := false;
       MEM_INT_PREFETCH_BASE      : std_logic_vector(31 downto 0) := x"00000000";
-      MEM_INT_IMEM_SEC           : integer := 1;
+      MEM_INT_IMEM_ECC_BP        : boolean := false;
       MEM_INT_IV_EN              : boolean := false;
       -- Internal Data memory (DMEM) --
       MEM_INT_DMEM_EN            : boolean := false;

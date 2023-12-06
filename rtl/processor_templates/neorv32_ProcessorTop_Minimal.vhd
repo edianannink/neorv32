@@ -47,7 +47,7 @@ entity neorv32_ProcessorTop_Minimal is
     MEM_INT_IMEM_SIZE     : natural                       := 16*1024;       -- size of processor-internal instruction memory in bytes
     MEM_INT_IMEM_PREFETCH : boolean                       := true;          -- fetch from external memory and store on internal memory
     MEM_INT_PREFETCH_BASE : std_logic_vector(31 downto 0) := x"00004000";
-    MEM_INT_IMEM_SEC      : integer                       := 1;             -- single error correction 0 = disabled, 1 = enabled
+    MEM_INT_IMEM_ECC_BP   : boolean                       := true;
     MEM_INT_IV_EN         : boolean                       := true;
     -- Internal Data memory --
     MEM_INT_DMEM_EN       : boolean := true;          -- implement processor-internal data memory
@@ -121,7 +121,7 @@ begin
     MEM_INT_IMEM_SIZE            => MEM_INT_IMEM_SIZE,      -- size of processor-internal instruction memory in bytes
     MEM_INT_IMEM_PREFETCH        => MEM_INT_IMEM_PREFETCH,  -- fetch from external memory and store on internal memory
     MEM_INT_PREFETCH_BASE        => MEM_INT_PREFETCH_BASE,
-    MEM_INT_IMEM_SEC             => MEM_INT_IMEM_SEC,       -- single error correction 0 = disabled, 1 = enabled
+    MEM_INT_IMEM_ECC_BP          => MEM_INT_IMEM_ECC_BP,
     MEM_INT_IV_EN                => MEM_INT_IV_EN,
     -- Internal Data memory --
     MEM_INT_DMEM_EN              => MEM_INT_DMEM_EN,   -- implement processor-internal data memory

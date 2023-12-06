@@ -254,6 +254,7 @@ begin
     MEM_INT_IMEM_PREFETCH        => true,
     MEM_INT_PREFETCH_BASE        => x"00004000",
     MEM_INT_IV_EN                => true,
+    MEM_INT_IMEM_ECC_BP          => true,
     -- Internal Data memory --
     MEM_INT_DMEM_EN              => true,    -- implement processor-internal data memory
     MEM_INT_DMEM_SIZE            => dmem_size_c,   -- size of processor-internal data memory in bytes

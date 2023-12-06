@@ -9,7 +9,7 @@ entity neorv32_imem_prefetch is
   generic (
     IMEM_SIZE: natural;
     IMEM_AS_IROM: boolean;
-    IMEM_SEC: integer;
+    IMEM_ECC_BYPASS: boolean;
     IMEM_PREFETCH_BASE: std_ulogic_vector(31 downto 0)
   );
   port (
@@ -19,6 +19,7 @@ entity neorv32_imem_prefetch is
     bus_rsp_o   : out bus_rsp_t;  -- bus response
     bus_req_o   : out bus_req_t;  -- prefetch request
     bus_rsp_i   : in bus_rsp_t;   -- prefetch response
+    data_uc_o   : out std_ulogic_vector(31 downto 0);
     fetched_o   : out std_ulogic;
     ecc_error_o : out std_ulogic_vector(1 downto 0)  -- ECC error
   );
@@ -45,12 +46,10 @@ architecture rtl of neorv32_imem_prefetch is
   end component;
 
   component prim_secded_15_10_dec
-  generic (
-    sec : integer
-  );
   port (
     data_i : in std_ulogic_vector(14 downto 0);
     data_o : out std_ulogic_vector(9 downto 0);
+    data_orig_o : out std_ulogic_vector(9 downto 0);
     syndrome_o : out std_ulogic_vector(4 downto 0);
     err_o : out std_ulogic_vector(1 downto 0)
   );
@@ -64,24 +63,22 @@ architecture rtl of neorv32_imem_prefetch is
   end component;
 
   component prim_secded_16_11_dec
-  generic (
-    sec : integer
-  );
   port (
     data_i : in std_ulogic_vector(15 downto 0);
     data_o : out std_ulogic_vector(10 downto 0);
+    data_orig_o : out std_ulogic_vector(10 downto 0);
     syndrome_o : out std_ulogic_vector(4 downto 0);
     err_o : out std_ulogic_vector(1 downto 0)
   );
   end component;
 
-  signal b0_ecc_enc_o                             : std_ulogic_vector(14 downto 0); 
-  signal b0_ecc_dec_i                             : std_ulogic_vector(14 downto 0);
-  signal b0_ecc_dec_o                             : std_ulogic_vector(9 downto 0);
+  signal b0_ecc_enc_o                                                     : std_ulogic_vector(14 downto 0); 
+  signal b0_ecc_dec_i                                                     : std_ulogic_vector(14 downto 0);
+  signal b0_ecc_dec_o, b0_ecc_dec_orig_o                                  : std_ulogic_vector(9 downto 0);
 
-  signal b1_ecc_enc_o, b2_ecc_enc_o               : std_ulogic_vector(15 downto 0);
-  signal b1_ecc_dec_i, b2_ecc_dec_i               : std_ulogic_vector(15 downto 0);
-  signal b1_ecc_dec_o, b2_ecc_dec_o               : std_ulogic_vector(10 downto 0);
+  signal b1_ecc_enc_o, b2_ecc_enc_o                                       : std_ulogic_vector(15 downto 0);
+  signal b1_ecc_dec_i, b2_ecc_dec_i                                       : std_ulogic_vector(15 downto 0);
+  signal b1_ecc_dec_o, b1_ecc_dec_orig_o, b2_ecc_dec_o, b2_ecc_dec_orig_o : std_ulogic_vector(10 downto 0);
   
   signal b0_ecc_err_o, b1_ecc_err_o, b2_ecc_err_o : std_ulogic_vector(1 downto 0);
 
@@ -106,34 +103,28 @@ begin
   );
 
   prim_secded_15_10_dec_inst_byte0: prim_secded_15_10_dec
-    generic map (
-      sec => IMEM_SEC
-    )
     port map (
       data_i     => b0_ecc_dec_i,
       data_o     => b0_ecc_dec_o,
+      data_orig_o=> b0_ecc_dec_orig_o,
       syndrome_o => open,
       err_o      => b0_ecc_err_o
     );
 
   prim_secded_16_11_dec_inst_byte1: prim_secded_16_11_dec
-    generic map (
-      sec => IMEM_SEC
-    )
     port map (
       data_i     => b1_ecc_dec_i,
       data_o     => b1_ecc_dec_o,
+      data_orig_o=> b1_ecc_dec_orig_o,
       syndrome_o => open,
       err_o      => b1_ecc_err_o
     );
 
   prim_secded_16_11_dec_inst_byte2: prim_secded_16_11_dec
-    generic map (
-      sec => IMEM_SEC
-    )
     port map (
       data_i     => b2_ecc_dec_i,
       data_o     => b2_ecc_dec_o,
+      data_orig_o=> b2_ecc_dec_orig_o,
       syndrome_o => open,
       err_o      => b2_ecc_err_o
     );
@@ -202,6 +193,7 @@ begin
   bus_rsp_o.err  <= '0'; -- no access error possible
 
   bus_rsp_o.data <= b2_ecc_dec_o & b1_ecc_dec_o & b0_ecc_dec_o when (rden = '1') else (others => '0');
+  data_uc_o <= b2_ecc_dec_orig_o & b1_ecc_dec_orig_o & b0_ecc_dec_orig_o when (rden = '1' and IMEM_ECC_BYPASS = true) else (others => '0');
 	fetched_o <= fetched;
 
   ecc_error_o(0) <= (b0_ecc_err_o(0) or b1_ecc_err_o(0) or b2_ecc_err_o(0)) when (rden = '1') else '0';

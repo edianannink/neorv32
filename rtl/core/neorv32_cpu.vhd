@@ -72,7 +72,8 @@ entity neorv32_cpu is
     HPM_NUM_CNTS                 : natural range 0 to 13; -- number of implemented HPM counters (0..13)
     HPM_CNT_WIDTH                : natural range 0 to 64; -- total size of HPM counters (0..64)
     -- Instruction Validator --
-    MEM_INT_IV_EN                : boolean
+    MEM_INT_IV_EN                : boolean;
+    MEM_INT_IMEM_ECC_BP          : boolean
   );
   port (
     -- global control --
@@ -100,7 +101,8 @@ entity neorv32_cpu is
     -- instruction validator --
     illegal_instr: out std_ulogic;
     -- imem fetched --
-    imem_fetched_i: in std_ulogic
+    imem_fetched_i: in std_ulogic;
+    imem_uc_instr: in std_ulogic_vector(31 downto 0)
   );
 end neorv32_cpu;
 
@@ -217,7 +219,8 @@ begin
     HPM_NUM_CNTS               => HPM_NUM_CNTS,                 -- number of implemented HPM counters (0..13)
     HPM_CNT_WIDTH              => HPM_CNT_WIDTH,                -- total size of HPM counters
     -- Instruction Validator --
-    MEM_INT_IV_EN              => MEM_INT_IV_EN
+    MEM_INT_IV_EN              => MEM_INT_IV_EN,
+    MEM_INT_ECC_BYPASS         => MEM_INT_IMEM_ECC_BP
   )
   port map (
     -- global control --
@@ -267,7 +270,8 @@ begin
     -- instruction validator --
     illegal_instr_o => illegal_instr,
     -- imem fetched --
-    imem_fetched_i => imem_fetched_i
+    imem_fetched_i => imem_fetched_i,
+    imem_uc_instr => imem_uc_instr
   );
 
   -- external CSR read-back --

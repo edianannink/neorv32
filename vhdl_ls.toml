@@ -209,8 +209,8 @@ files = [
     "/home/edian/git/neorv32-iv-experiments/logic/neorv32/rtl/core/neorv32_hsiao_13_8_enc.sv",
     "/home/edian/git/neorv32-iv-experiments/logic/neorv32/rtl/core/neorv32_hsiao_13_8_dec.sv",
     "/home/edian/git/neorv32-iv-experiments/logic/iv/ram.vhd",
-    "/home/edian/git/neorv32-iv-experiments/logic/iv/timeout.vhd",
     "/home/edian/git/neorv32-iv-experiments/logic/iv/multiply_shift.vhd",
     "/home/edian/git/neorv32-iv-experiments/logic/iv/instruction_validator.vhd",
-    "/home/edian/git/neorv32-iv-experiments/logic/iv/oneshot.vhd"
+    "/home/edian/git/neorv32-iv-experiments/logic/misc/timeout.vhd",
+    "/home/edian/git/neorv32-iv-experiments/logic/misc/oneshot.vhd"
 ]

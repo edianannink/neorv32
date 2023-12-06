@@ -82,7 +82,8 @@ entity neorv32_cpu_control is
     HPM_NUM_CNTS               : natural range 0 to 13; -- number of implemented HPM counters (0..13)
     HPM_CNT_WIDTH              : natural range 0 to 64; -- total size of HPM counters (0..64)
     -- Instruction Validator --
-    MEM_INT_IV_EN              : boolean
+    MEM_INT_IV_EN              : boolean;
+    MEM_INT_ECC_BYPASS         : boolean
   );
   port (
     -- global control --
@@ -130,7 +131,8 @@ entity neorv32_cpu_control is
     -- instruction validator --
     illegal_instr_o: out std_ulogic;
     -- imem fetched --
-    imem_fetched_i: in std_ulogic
+    imem_fetched_i: in std_ulogic;
+    imem_uc_instr: in std_ulogic_vector(31 downto 0)
   );
 end neorv32_cpu_control;
 
@@ -363,6 +365,7 @@ architecture neorv32_cpu_control_rtl of neorv32_cpu_control is
   -- Instruction validator --
   signal illegal_instr  : std_ulogic := '0';
   signal dsp_timeout    : std_ulogic;
+  signal instruction    : std_ulogic_vector(31 downto 0);
 
 begin
 
@@ -374,7 +377,7 @@ begin
     port map (
       clk               => clk_i,
       reset             => not rstn_i,
-      instr             => bus_rsp_i.data,
+      instr             => instruction,
       addr              => fetch_engine.pc,
       ack_instr         => bus_rsp_i.ack,
       illegal_instr     => illegal_instr,
@@ -382,6 +385,7 @@ begin
     );
   end generate;
 
+  instruction <= imem_uc_instr when MEM_INT_ECC_BYPASS = true else bus_rsp_i.data;
   illegal_instr_o <= illegal_instr;
 
 -- ****************************************************************************************************************************
@@ -2366,7 +2370,7 @@ begin
   cnt_event(hpmcnt_event_ecc_de_regfile) <= '1' when (ecc_error_regfile_i(1) = '1') else '0';
 
   --cnt_event(hpmcnt_event_load_c)    <= '1' when (ctrl.lsu_req = '1') and (ctrl.lsu_rw = '0')                                  else '0'; -- load operation
-  cnt_event(hpmcnt_event_iv) <= '1' when (illegal_instr = '1' and bus_rsp_i.ack = '1') else '0';
+  cnt_event(hpmcnt_event_iv) <= '1' when (illegal_instr = '1') else '0';
   
   --cnt_event(hpmcnt_event_store_c)   <= '1' when (ctrl.lsu_req = '1') and (ctrl.lsu_rw = '1')                                  else '0'; -- store operation
   cnt_event(hpmcnt_event_ecc_se_imem) <= '1' when (ecc_error_imem_i(0) = '1') else '0';

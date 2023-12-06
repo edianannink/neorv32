@@ -90,7 +90,7 @@ entity neorv32_top is
     MEM_INT_IMEM_SIZE          : natural := 16*1024;                            -- size of processor-internal instruction memory in bytes (use a power of 2)
     MEM_INT_IMEM_PREFETCH      : boolean := false;
     MEM_INT_PREFETCH_BASE      : std_logic_vector(31 downto 0) := x"00000000";
-    MEM_INT_IMEM_SEC           : integer := 1;
+    MEM_INT_IMEM_ECC_BP        : boolean := false;
     MEM_INT_IV_EN              : boolean := false;
     
     -- Internal Data memory (DMEM) --
@@ -342,6 +342,7 @@ architecture neorv32_top_rtl of neorv32_top is
   -- ECC and IV --
   signal ecc_error_dmem_o, ecc_error_imem_o : std_ulogic_vector(1 downto 0);
   signal imem_fetched : std_ulogic;
+  signal imem_uc_instr : std_ulogic_vector(31 downto 0);
 
 begin
 
@@ -524,7 +525,8 @@ begin
       HPM_NUM_CNTS               => HPM_NUM_CNTS,
       HPM_CNT_WIDTH              => HPM_CNT_WIDTH,
       -- Instruction Validator -- 
-      MEM_INT_IV_EN              => MEM_INT_IV_EN
+      MEM_INT_IV_EN              => MEM_INT_IV_EN,
+      MEM_INT_IMEM_ECC_BP        => MEM_INT_IMEM_ECC_BP
     )
     port map (
       -- global control --
@@ -552,7 +554,8 @@ begin
       -- instruction validator
       illegal_instr => illegal_instr,
       -- imem fetched --
-      imem_fetched_i => imem_fetched
+      imem_fetched_i => imem_fetched,
+      imem_uc_instr => imem_uc_instr
     );
 
     -- advanced memory control --
@@ -816,7 +819,7 @@ begin
       generic map (
         IMEM_SIZE           => imem_size_c,
         IMEM_AS_IROM        => imem_as_rom_c,
-        IMEM_SEC            => MEM_INT_IMEM_SEC,
+        IMEM_ECC_BYPASS     => MEM_INT_IMEM_ECC_BP,
         IMEM_PREFETCH_BASE  => MEM_INT_PREFETCH_BASE
       )
       port map (
@@ -826,6 +829,7 @@ begin
         bus_rsp_o => imem_rsp,
         bus_req_o => imem_prefetch_req,
         bus_rsp_i => xbus_rsp,
+        data_uc_o => imem_uc_instr,
         fetched_o => imem_fetched,
         ecc_error_o => ecc_error_imem_o
       );
