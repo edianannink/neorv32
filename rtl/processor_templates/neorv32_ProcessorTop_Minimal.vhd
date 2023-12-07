@@ -56,6 +56,9 @@ entity neorv32_ProcessorTop_Minimal is
     IO_PWM_NUM_CH         : natural := 0;             -- number of PWM channels to implement (0..12); 0 = disabled
     -- External memory interface (WISHBONE) --
     MEM_EXT_EN            : boolean := true;          -- implement external memory bus interface?
+    -- Physical Memory Protection (PMP) --
+    PMP_NUM_REGIONS            : natural range 0 to 16 := 8; -- number of regions (0..16)
+    PMP_MIN_GRANULARITY        : natural := 4;  
     -- RISC-V CPU Extensions --
     CPU_EXTENSION_RISCV_A        : boolean := true;  -- implement atomic memory operations extension?
     CPU_EXTENSION_RISCV_B        : boolean := false;  -- implement bit-manipulation extension?
@@ -131,6 +134,9 @@ begin
     IO_PWM_NUM_CH                => IO_PWM_NUM_CH,     -- number of PWM channels to implement (0..12); 0 = disabled
     -- External memory interface (WISHBONE) --
     MEM_EXT_EN                   => MEM_EXT_EN,        -- implement external memory bus interface?
+    -- Physical Memory Protection (PMP) --
+    PMP_NUM_REGIONS              => PMP_NUM_REGIONS,               -- number of regions (0..16)
+    PMP_MIN_GRANULARITY          => PMP_MIN_GRANULARITY,  
     -- RISC-V CPU Extensions --
     CPU_EXTENSION_RISCV_A        => CPU_EXTENSION_RISCV_A,         -- implement atomic memory operations extension?
     CPU_EXTENSION_RISCV_B        => CPU_EXTENSION_RISCV_B,         -- implement bit-manipulation extension?
