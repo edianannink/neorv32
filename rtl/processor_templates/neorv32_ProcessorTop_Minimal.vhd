@@ -57,7 +57,7 @@ entity neorv32_ProcessorTop_Minimal is
     -- External memory interface (WISHBONE) --
     MEM_EXT_EN            : boolean := true;          -- implement external memory bus interface?
     -- Physical Memory Protection (PMP) --
-    PMP_NUM_REGIONS            : natural range 0 to 16 := 8; -- number of regions (0..16)
+    PMP_NUM_REGIONS            : natural range 0 to 16 := 4; -- number of regions (0..16)
     PMP_MIN_GRANULARITY        : natural := 4;  
     -- RISC-V CPU Extensions --
     CPU_EXTENSION_RISCV_A        : boolean := true;  -- implement atomic memory operations extension?
@@ -65,7 +65,7 @@ entity neorv32_ProcessorTop_Minimal is
     CPU_EXTENSION_RISCV_C        : boolean := true;   -- implement compressed extension?
     CPU_EXTENSION_RISCV_E        : boolean := false;  -- implement embedded RF extension?
     CPU_EXTENSION_RISCV_M        : boolean := true;   -- implement mul/div extension?
-    CPU_EXTENSION_RISCV_U        : boolean := false;   -- implement user mode extension?
+    CPU_EXTENSION_RISCV_U        : boolean := true;   -- implement user mode extension?
     CPU_EXTENSION_RISCV_Zfinx    : boolean := false;  -- implement 32-bit floating-point extension (using INT regs!)
     CPU_EXTENSION_RISCV_Zicntr   : boolean := true;   -- implement base counters?
     CPU_EXTENSION_RISCV_Zihpm    : boolean := true;   -- implement hardware performance monitors?

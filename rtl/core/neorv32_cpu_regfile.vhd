@@ -92,6 +92,9 @@ architecture neorv32_cpu_regfile_rtl of neorv32_cpu_regfile is
   end component;
 
   component prim_secded_39_32_dec
+  generic (
+    sec : integer
+  );
   port (
     data_i : in std_ulogic_vector(38 downto 0);
     data_o : out std_ulogic_vector(31 downto 0);
@@ -268,6 +271,9 @@ begin
     );
 
   prim_secded_39_32_dec_inst_opa: prim_secded_39_32_dec
+    generic map (
+      sec => 0
+    )
     port map (
       data_i     => reg_file(to_integer(unsigned(ctrl_i.rf_rs1(addr_bits_c-1 downto 0)))),
       data_o     => ecc_dec_rs1_out,
@@ -276,6 +282,9 @@ begin
     );
 
   prim_secded_39_32_dec_inst_opb: prim_secded_39_32_dec
+    generic map (
+      sec => 0
+    )
     port map (
       data_i     => reg_file(to_integer(unsigned(ctrl_i.rf_rs2(addr_bits_c-1 downto 0)))),
       data_o     => ecc_dec_rs2_out,

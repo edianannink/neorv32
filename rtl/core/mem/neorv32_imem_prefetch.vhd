@@ -46,6 +46,9 @@ architecture rtl of neorv32_imem_prefetch is
   end component;
 
   component prim_secded_15_10_dec
+  generic (
+    sec : integer
+  );
   port (
     data_i : in std_ulogic_vector(14 downto 0);
     data_o : out std_ulogic_vector(9 downto 0);
@@ -63,6 +66,9 @@ architecture rtl of neorv32_imem_prefetch is
   end component;
 
   component prim_secded_16_11_dec
+  generic (
+    sec : integer
+  );
   port (
     data_i : in std_ulogic_vector(15 downto 0);
     data_o : out std_ulogic_vector(10 downto 0);
@@ -103,6 +109,9 @@ begin
   );
 
   prim_secded_15_10_dec_inst_byte0: prim_secded_15_10_dec
+    generic map (
+      sec => 0
+    )
     port map (
       data_i     => b0_ecc_dec_i,
       data_o     => b0_ecc_dec_o,
@@ -112,6 +121,9 @@ begin
     );
 
   prim_secded_16_11_dec_inst_byte1: prim_secded_16_11_dec
+    generic map (
+      sec => 0
+    )
     port map (
       data_i     => b1_ecc_dec_i,
       data_o     => b1_ecc_dec_o,
@@ -121,6 +133,9 @@ begin
     );
 
   prim_secded_16_11_dec_inst_byte2: prim_secded_16_11_dec
+    generic map (
+      sec => 0
+    )
     port map (
       data_i     => b2_ecc_dec_i,
       data_o     => b2_ecc_dec_o,

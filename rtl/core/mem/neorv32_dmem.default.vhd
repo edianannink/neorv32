@@ -62,6 +62,9 @@ architecture neorv32_dmem_rtl of neorv32_dmem is
   end component;
 
   component prim_secded_13_8_dec
+  generic (
+    sec : integer
+  );
   port (
     data_i : in std_ulogic_vector(12 downto 0);
     data_o : out std_ulogic_vector(7 downto 0);
@@ -148,36 +151,48 @@ begin
   );
 
   prim_secded_13_8_dec_inst_byte0: prim_secded_13_8_dec
-    port map (
-      data_i     => mem_ram_b0_rd,
-      data_o     => rdata(7 downto 0),
-      syndrome_o => open,
-      err_o      => ecc_error_byte0
-    );
+  generic map (
+      sec => 0
+  )
+  port map (
+    data_i     => mem_ram_b0_rd,
+    data_o     => rdata(7 downto 0),
+    syndrome_o => open,
+    err_o      => ecc_error_byte0
+  );
 
   prim_secded_13_8_dec_inst_byte1: prim_secded_13_8_dec
-    port map (
-      data_i     => mem_ram_b1_rd,
-      data_o     => rdata(15 downto 8),
-      syndrome_o => open,
-      err_o      => ecc_error_byte1
-    );
+  generic map (
+      sec => 0
+  )
+  port map (
+    data_i     => mem_ram_b1_rd,
+    data_o     => rdata(15 downto 8),
+    syndrome_o => open,
+    err_o      => ecc_error_byte1
+  );
 
   prim_secded_13_8_dec_inst_byte2: prim_secded_13_8_dec
-    port map (
-      data_i     => mem_ram_b2_rd,
-      data_o     => rdata(23 downto 16),
-      syndrome_o => open,
-      err_o      => ecc_error_byte2
-    );
+  generic map (
+      sec => 0
+  )
+  port map (
+    data_i     => mem_ram_b2_rd,
+    data_o     => rdata(23 downto 16),
+    syndrome_o => open,
+    err_o      => ecc_error_byte2
+  );
 
   prim_secded_13_8_dec_inst_byte3: prim_secded_13_8_dec
-    port map (
-      data_i     => mem_ram_b3_rd,
-      data_o     => rdata(31 downto 24),
-      syndrome_o => open,
-      err_o      => ecc_error_byte3
-    );
+  generic map (
+      sec => 0
+  )
+  port map (
+    data_i     => mem_ram_b3_rd,
+    data_o     => rdata(31 downto 24),
+    syndrome_o => open,
+    err_o      => ecc_error_byte3
+  );
 
   ecc_error(0) <= ecc_error_byte0(0) when (bus_req_i.ben(0) = '1') else '0' or 
                   ecc_error_byte1(0) when (bus_req_i.ben(1) = '1') else '0' or 
